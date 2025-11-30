@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Wisdom</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="daily wisdom css/daily wisdom.css">
+    <style>
+        
+    </style>
+</head>
+<body>
+    <!-- Home Screen -->
+    <div id="homeScreen" class="screen active">
+        <div class="home-container">
+            <div class="date-display" id="currentDate"></div>
+            <div id="dailyQuoteContainer"></div>
+        </div>
+    </div>
+
+    <!-- Gallery Screen -->
+    <div id="galleryScreen" class="screen">
+        <div class="gallery-header">
+            <h1 class="gallery-title">My Collection</h1>
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="active">Active</button>
+                <button class="filter-tab" data-filter="archived">Archived</button>
+                <button class="filter-tab" data-filter="deleted">Deleted</button>
+            </div>
+        </div>
+        <div class="gallery-actions">
+            <button class="btn btn-primary" id="addQuoteBtn">+ Add Quote</button>
+            <button class="btn btn-secondary hidden" id="archiveSelectedBtn">Archive</button>
+            <button class="btn btn-secondary hidden" id="deleteSelectedBtn">Delete</button>
+            <button class="btn btn-secondary hidden" id="recoverSelectedBtn">Recover</button>
+            <button class="btn btn-secondary hidden" id="cancelSelectionBtn">Cancel</button>
+        </div>
+        <div class="gallery-grid" id="galleryGrid"></div>
+    </div>
+
+    <!-- Search Screen -->
+    <div id="searchScreen" class="screen">
+        <div class="search-container">
+            <h1 class="gallery-title" style="margin-bottom: 30px;">Search Quotes</h1>
+            <div class="search-box">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search by keywords...">
+            </div>
+            <div class="date-filters">
+                <div class="date-input-group">
+                    <label class="date-input-label">From Date</label>
+                    <input type="date" class="date-input" id="searchFromDate">
+                </div>
+                <div class="date-input-group">
+                    <label class="date-input-label">To Date</label>
+                    <input type="date" class="date-input" id="searchToDate">
+                </div>
+            </div>
+            <div class="search-results">
+                <div class="search-results-count" id="searchResultsCount"></div>
+                <div class="gallery-grid" id="searchResultsGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Screen -->
+    <div id="settingsScreen" class="screen">
+        <div class="settings-container">
+            <h1 class="gallery-title" style="margin-bottom: 30px;">Settings</h1>
+
+            <div class="settings-section">
+                <h2 class="settings-section-title">Appearance</h2>
+                <div class="settings-item">
+                    <div>
+                        <div class="settings-item-label">Dark Mode</div>
+                        <div class="settings-item-description">Toggle dark mode theme</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="darkModeToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h2 class="settings-section-title">Data Management</h2>
+                <div class="settings-item">
+                    <div>
+                        <div class="settings-item-label">Total Quotes</div>
+                        <div class="settings-item-description" id="totalQuotesCount">0 quotes in collection</div>
+                    </div>
+                </div>
+                <div class="settings-item">
+                    <div>
+                        <div class="settings-item-label">Clear All Data</div>
+                        <div class="settings-item-description">Permanently delete all quotes</div>
+                    </div>
+                    <button class="btn btn-danger" id="clearDataBtn">Clear</button>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <h2 class="settings-section-title">About</h2>
+                <div class="settings-item">
+                    <div>
+                        <div class="settings-item-label">Version</div>
+                        <div class="settings-item-description">Daily Wisdom v1.0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-screen="homeScreen">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Home</span>
+        </button>
+        <button class="nav-item" data-screen="searchScreen">
+            <span class="nav-icon">🔍</span>
+            <span class="nav-label">Search</span>
+        </button>
+        <button class="nav-item" data-screen="galleryScreen">
+            <span class="nav-icon">📚</span>
+            <span class="nav-label">Gallery</span>
+        </button>
+        <button class="nav-item" data-screen="settingsScreen">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Settings</span>
+        </button>
+    </nav>
+
+    <!-- Add Quote Modal -->
+    <div class="modal" id="addQuoteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New Quote</h2>
+                <button class="modal-close" id="closeAddModal">×</button>
+            </div>
+            <form id="addQuoteForm">
+                <div class="form-group">
+                    <label class="form-label">Quote Text</label>
+                    <textarea class="form-textarea" id="quoteText" placeholder="Enter your quote or wisdom..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Image (Optional)</label>
+                    <div class="file-upload" id="fileUploadArea">
+                        <div class="file-upload-icon">📷</div>
+                        <div class="file-upload-text">Click to upload an image</div>
+                        <input type="file" id="quoteImage" accept="image/*" class="hidden">
+                    </div>
+                    <div class="file-preview hidden" id="imagePreview"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelAddBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Quote</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Dark mode detection and setup
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('darkModeToggle').checked = true;
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('darkModeToggle').checked = true;
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('darkModeToggle').checked = false;
+            }
+        });
+
+        // IndexedDB Setup
+        let db;
+        const DB_NAME = 'DailyWisdomDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'quotes';
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                        objectStore.createIndex('status', 'status', { unique: false });
+                        objectStore.createIndex('createdAt', 'createdAt', { unique: false });
+                        objectStore.createIndex('deletedAt', 'deletedAt', { unique: false });
+                    }
+                };
+            });
+        }
+
+        // Database operations
+        function addQuote(quote) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.add(quote);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function getAllQuotes() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function updateQuote(id, updates) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const getRequest = store.get(id);
+
+                getRequest.onsuccess = () => {
+                    const quote = getRequest.result;
+                    Object.assign(quote, updates);
+                    const updateRequest = store.put(quote);
+                    updateRequest.onsuccess = () => resolve();
+                    updateRequest.onerror = () => reject(updateRequest.error);
+                };
+                getRequest.onerror = () => reject(getRequest.error);
+            });
+        }
+
+        function deleteQuote(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.delete(id);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function clearAllData() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.clear();
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // State management
+        let selectedQuotes = new Set();
+        let currentFilter = 'active';
+
+        // Navigation
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.nav-item').classList.add('active');
+
+            // Load screen data
+            if (screenId === 'homeScreen') {
+                loadDailyQuote();
+            } else if (screenId === 'galleryScreen') {
+                loadGallery(currentFilter);
+            } else if (screenId === 'settingsScreen') {
+                updateSettingsStats();
+            }
+        }
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const screenId = item.dataset.screen;
+                switchScreen(screenId);
+            });
+        });
+
+        // Date formatting
+        function formatDate(date) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(date).toLocaleDateString('en-US', options);
+        }
+
+        function formatDateShort(date) {
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            return new Date(date).toLocaleDateString('en-US', options);
+        }
+
+        // Display current date
+        document.getElementById('currentDate').textContent = formatDate(new Date());
+
+        // Daily Quote Logic
+        function getDailyQuoteSeed() {
+            const today = new Date();
+            return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+        }
+
+        function seededRandom(seed) {
+            const x = Math.sin(seed) * 10000;
+            return x - Math.floor(x);
+        }
+
+        async function loadDailyQuote() {
+            const quotes = await getAllQuotes();
+            const activeQuotes = quotes.filter(q => q.status === 'active');
+
+            const container = document.getElementById('dailyQuoteContainer');
+
+            if (activeQuotes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">✨</div>
+                        <div class="empty-state-text">No quotes yet. Add your first quote to get started!</div>
+                        <button class="btn btn-primary" onclick="openAddModal()">Add Your First Quote</button>
+                    </div>
+                `;
+                return;
+            }
+
+            const seed = getDailyQuoteSeed();
+            const randomIndex = Math.floor(seededRandom(seed) * activeQuotes.length);
+            const dailyQuote = activeQuotes[randomIndex];
+
+            let quoteHTML = '<div class="quote-card">';
+
+            if (dailyQuote.image) {
+                quoteHTML += `<img src="${dailyQuote.image}" alt="Quote image" class="quote-image">`;
+            }
+
+            if (dailyQuote.text) {
+                quoteHTML += `<div class="quote-text">${dailyQuote.text}</div>`;
+            }
+
+            quoteHTML += `<div class="quote-meta">Added ${formatDateShort(dailyQuote.createdAt)}</div>`;
+            quoteHTML += '</div>';
+
+            container.innerHTML = quoteHTML;
+        }
+
+        // Gallery Management
+        async function loadGallery(filter = 'active') {
+            currentFilter = filter;
+            selectedQuotes.clear();
+            updateSelectionUI();
+
+            const quotes = await getAllQuotes();
+            let filteredQuotes = [];
+
+            if (filter === 'active') {
+                filteredQuotes = quotes.filter(q => q.status === 'active');
+            } else if (filter === 'archived') {
+                filteredQuotes = quotes.filter(q => q.status === 'archived');
+            } else if (filter === 'deleted') {
+                // Show deleted items that haven't expired (within 30 days)
+                const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                filteredQuotes = quotes.filter(q => {
+                    if (q.status === 'deleted' && q.deletedAt) {
+                        return q.deletedAt > thirtyDaysAgo;
+                    }
+                    return false;
+                });
+            }
+
+            const grid = document.getElementById('galleryGrid');
+
+            if (filteredQuotes.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-text">No ${filter} quotes found</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by creation date, newest first
+            filteredQuotes.sort((a, b) => b.createdAt - a.createdAt);
+
+            grid.innerHTML = filteredQuotes.map(quote => `
+                <div class="gallery-item" data-id="${quote.id}">
+                    <div class="selection-indicator">✓</div>
+                    ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
+                    <div class="gallery-item-content">
+                        ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
+                        <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add click handlers for selection
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                item.addEventListener('click', toggleSelection);
+            });
+        }
+
+        function toggleSelection(e) {
+            const item = e.currentTarget;
+            const id = parseInt(item.dataset.id);
+
+            if (selectedQuotes.has(id)) {
+                selectedQuotes.delete(id);
+                item.classList.remove('selected');
+            } else {
+                selectedQuotes.add(id);
+                item.classList.add('selected');
+            }
+
+            updateSelectionUI();
+        }
+
+        function updateSelectionUI() {
+            const hasSelection = selectedQuotes.size > 0;
+
+            document.getElementById('archiveSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter !== 'active');
+            document.getElementById('deleteSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter === 'deleted');
+            document.getElementById('recoverSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter !== 'deleted');
+            document.getElementById('cancelSelectionBtn').classList.toggle('hidden', !hasSelection);
+        }
+
+        // Filter tabs
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                loadGallery(tab.dataset.filter);
+            });
+        });
+
+        // Add quote modal
+        function openAddModal() {
+            document.getElementById('addQuoteModal').classList.add('active');
+            document.getElementById('quoteText').value = '';
+            document.getElementById('quoteImage').value = '';
+            document.getElementById('imagePreview').innerHTML = '';
+            document.getElementById('imagePreview').classList.add('hidden');
+        }
+
+        function closeAddModal() {
+            document.getElementById('addQuoteModal').classList.remove('active');
+        }
+
+        document.getElementById('addQuoteBtn').addEventListener('click', openAddModal);
+        document.getElementById('closeAddModal').addEventListener('click', closeAddModal);
+        document.getElementById('cancelAddBtn').addEventListener('click', closeAddModal);
+
+        // File upload
+        document.getElementById('fileUploadArea').addEventListener('click', () => {
+            document.getElementById('quoteImage').click();
+        });
+
+        document.getElementById('quoteImage').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const preview = document.getElementById('imagePreview');
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                    preview.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Add quote form submission
+        document.getElementById('addQuoteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const text = document.getElementById('quoteText').value.trim();
+            const imageFile = document.getElementById('quoteImage').files[0];
+
+            if (!text && !imageFile) {
+                showCustomAlert('Please add either text or an image');
+                return;
+            }
+
+            let imageData = null;
+            if (imageFile) {
+                imageData = await fileToBase64(imageFile);
+            }
+
+            const quote = {
+                text: text,
+                image: imageData,
+                status: 'active',
+                createdAt: Date.now(),
+                deletedAt: null
+            };
+
+            await addQuote(quote);
+            closeAddModal();
+            loadGallery(currentFilter);
+            loadDailyQuote();
+            showCustomAlert('Quote added successfully!');
+        });
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Gallery actions
+        document.getElementById('archiveSelectedBtn').addEventListener('click', async () => {
+            if (selectedQuotes.size === 0) return;
+
+            showCustomConfirm(`Archive ${selectedQuotes.size} quote(s)?`, async () => {
+                for (const id of selectedQuotes) {
+                    await updateQuote(id, { status: 'archived' });
+                }
+                selectedQuotes.clear();
+                loadGallery(currentFilter);
+                loadDailyQuote();
+            });
+        });
+
+        document.getElementById('deleteSelectedBtn').addEventListener('click', async () => {
+            if (selectedQuotes.size === 0) return;
+
+            const message = currentFilter === 'archived'
+                ? `Move ${selectedQuotes.size} quote(s) to trash? They will be permanently deleted after 30 days.`
+                : `Delete ${selectedQuotes.size} quote(s)? They will be moved to trash for 30 days.`;
+
+            showCustomConfirm(message, async () => {
+                for (const id of selectedQuotes) {
+                    await updateQuote(id, { status: 'deleted', deletedAt: Date.now() });
+                }
+                selectedQuotes.clear();
+                loadGallery(currentFilter);
+                loadDailyQuote();
+            });
+        });
+
+        document.getElementById('recoverSelectedBtn').addEventListener('click', async () => {
+            if (selectedQuotes.size === 0) return;
+
+            for (const id of selectedQuotes) {
+                await updateQuote(id, { status: 'active', deletedAt: null });
+            }
+            selectedQuotes.clear();
+            loadGallery(currentFilter);
+            loadDailyQuote();
+            showCustomAlert('Quote(s) recovered successfully!');
+        });
+
+        document.getElementById('cancelSelectionBtn').addEventListener('click', () => {
+            selectedQuotes.clear();
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            updateSelectionUI();
+        });
+
+        // Search functionality
+        let searchTimeout;
+        document.getElementById('searchInput').addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(performSearch, 300);
+        });
+
+        document.getElementById('searchFromDate').addEventListener('change', performSearch);
+        document.getElementById('searchToDate').addEventListener('change', performSearch);
+
+        async function performSearch() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+            const fromDate = document.getElementById('searchFromDate').value;
+            const toDate = document.getElementById('searchToDate').value;
+
+            let quotes = await getAllQuotes();
+            quotes = quotes.filter(q => q.status === 'active');
+
+            // Filter by keyword
+            if (keyword) {
+                quotes = quotes.filter(q =>
+                    q.text && q.text.toLowerCase().includes(keyword)
+                );
+            }
+
+            // Filter by date range
+            if (fromDate) {
+                const fromTime = new Date(fromDate).getTime();
+                quotes = quotes.filter(q => q.createdAt >= fromTime);
+            }
+            if (toDate) {
+                const toTime = new Date(toDate).getTime() + (24 * 60 * 60 * 1000) - 1;
+                quotes = quotes.filter(q => q.createdAt <= toTime);
+            }
+
+            // Sort by relevance (most recent first)
+            quotes.sort((a, b) => b.createdAt - a.createdAt);
+
+            // Display results
+            const resultsCount = document.getElementById('searchResultsCount');
+            const resultsGrid = document.getElementById('searchResultsGrid');
+
+            resultsCount.textContent = `${quotes.length} result${quotes.length !== 1 ? 's' : ''} found`;
+
+            if (quotes.length === 0) {
+                resultsGrid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <div class="empty-state-icon">🔍</div>
+                        <div class="empty-state-text">No quotes match your search</div>
+                    </div>
+                `;
+                return;
+            }
+
+            resultsGrid.innerHTML = quotes.map(quote => `
+                <div class="gallery-item">
+                    ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
+                    <div class="gallery-item-content">
+                        ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
+                        <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Settings
+        document.getElementById('darkModeToggle').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        async function updateSettingsStats() {
+            const quotes = await getAllQuotes();
+            const activeQuotes = quotes.filter(q => q.status === 'active');
+            document.getElementById('totalQuotesCount').textContent =
+                `${activeQuotes.length} quote${activeQuotes.length !== 1 ? 's' : ''} in collection`;
+        }
+
+        document.getElementById('clearDataBtn').addEventListener('click', () => {
+            showCustomConfirm('Are you sure you want to permanently delete all quotes? This action cannot be undone.', async () => {
+                await clearAllData();
+                loadGallery(currentFilter);
+                loadDailyQuote();
+                updateSettingsStats();
+                showCustomAlert('All data has been cleared');
+            });
+        });
+
+        // Cleanup expired deleted quotes on app load
+        async function cleanupExpiredQuotes() {
+            const quotes = await getAllQuotes();
+            const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+
+            for (const quote of quotes) {
+                if (quote.status === 'deleted' && quote.deletedAt && quote.deletedAt < thirtyDaysAgo) {
+                    await deleteQuote(quote.id);
+                }
+            }
+        }
+
+        // Custom alert/confirm dialogs
+        function showCustomAlert(message) {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Notice</h2>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">${message}</p>
+                    <button class="btn btn-primary" style="width: 100%;" onclick="this.closest('.modal').remove()">OK</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function showCustomConfirm(message, onConfirm) {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Confirm</h2>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">${message}</p>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" style="flex: 1;" onclick="this.closest('.modal').remove()">Cancel</button>
+                        <button class="btn btn-primary confirm-btn" style="flex: 1;">Confirm</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            modal.querySelector('.confirm-btn').addEventListener('click', () => {
+                modal.remove();
+                onConfirm();
+            });
+        }
+
+        // Initialize app
+        async function initApp() {
+            await initDB();
+            await cleanupExpiredQuotes();
+            await loadDailyQuote();
+            await updateSettingsStats();
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
