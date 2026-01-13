@@ -17,10 +17,17 @@
     <div id="homeScreen" class="screen active">
         <div class="home-container">
             <div class="date-display" id="currentDate"></div>
-            <div id="dailyQuoteContainer"></div>
+            <!-- Quote + arrows -->
+            <div class="quote-wrapper">
+                <button id="prevQuoteBtn" class="quote-arrow left">←</button>
+                <div id="dailyQuoteContainer"></div>
+                <button id="nextQuoteBtn" class="quote-arrow right">→</button>
+            </div>
+            <!-- Action button -->
             <button class="btn btn-primary" id="addQuoteBtn">+ Add New Quote</button>
         </div>
     </div>
+
 
     <!-- Gallery Screen -->
     <div id="galleryScreen" class="screen">
@@ -313,53 +320,130 @@
         document.getElementById('currentDate').textContent = formatDate(new Date());
 
         // Daily Quote Logic
+        let activeQuotesCache = [];
+        let currentQuoteIndex = 0;
+        let history = [];          // stores indexes you’ve visited, in order
+        let historyPos = -1;       // where you currently are in history
+
+        function renderDailyQuoteByIndex() {
+        const container = document.getElementById('dailyQuoteContainer');
+        const dailyQuote = activeQuotesCache[currentQuoteIndex];
+
+        // safety guard (shouldn't happen, but prevents crashes)
+        if (!dailyQuote) return;
+
+        let quoteHTML = '<div class="quote-card">';
+
+        if (dailyQuote.image) {
+            quoteHTML += `<img src="${dailyQuote.image}" alt="Quote image" class="quote-image">`;
+        }
+
+        if (dailyQuote.text) {
+            quoteHTML += `<div class="quote-text">${dailyQuote.text}</div>`;
+        }
+
+        quoteHTML += `<div class="quote-meta">Added ${formatDateShort(dailyQuote.createdAt)}</div>`;
+        quoteHTML += `</div>`;
+
+        container.innerHTML = quoteHTML;
+        }
+
         function getDailyQuoteSeed() {
-            const today = new Date();
-            return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+        const today = new Date();
+        return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
         }
 
         function seededRandom(seed) {
-            const x = Math.sin(seed) * 10000;
-            return x - Math.floor(x);
+        const x = Math.sin(seed) * 10000;
+        return x - Math.floor(x);
         }
 
         async function loadDailyQuote() {
-            const quotes = await getAllQuotes();
-            const activeQuotes = quotes.filter(q => q.status === 'active');
+        const quotes = await getAllQuotes();
+        const activeQuotes = quotes.filter(q => q.status === 'active');
 
-            const container = document.getElementById('dailyQuoteContainer');
+        const container = document.getElementById('dailyQuoteContainer');
 
-            if (activeQuotes.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">✨</div>
-                        <div class="empty-state-text">No quotes yet. Add your first quote to get started!</div>
-                        <button class="btn btn-primary" onclick="openAddModal()">Add Your First Quote</button>
-                    </div>
-                `;
-                return;
-            }
-
-            const seed = getDailyQuoteSeed();
-            const randomIndex = Math.floor(seededRandom(seed) * activeQuotes.length);
-            const dailyQuote = activeQuotes[randomIndex];
-
-            let quoteHTML = '<div class="quote-card">';
-
-            if (dailyQuote.image) {
-                quoteHTML += `<img src="${dailyQuote.image}" alt="Quote image" class="quote-image">`;
-            }
-
-            if (dailyQuote.text) {
-                quoteHTML += `<div class="quote-text">${dailyQuote.text}</div>`;
-            }
-
-            quoteHTML += `<div class="quote-meta">Added ${formatDateShort(dailyQuote.createdAt)}</div>`;
-            quoteHTML += '</div>';
-
-            container.innerHTML = quoteHTML;
+        if (activeQuotes.length === 0) {
+            container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">✨</div>
+                <div class="empty-state-text">No quotes yet. Add your first quote to get started!</div>
+                <button class="btn btn-primary" onclick="openAddModal()">Add Your First Quote</button>
+            </div>
+            `;
+            return;
         }
 
+        activeQuotesCache = activeQuotes;
+
+        // pick today's starting quote (seeded)
+        const seed = getDailyQuoteSeed();
+        currentQuoteIndex = Math.floor(seededRandom(seed) * activeQuotesCache.length);
+
+        // initialize shuffle history starting at today's quote
+        history = [currentQuoteIndex];
+        historyPos = 0;
+
+        renderDailyQuoteByIndex();
+        }
+
+        function showNextRandomQuote() {
+        if (!activeQuotesCache.length) return;
+
+        // if user went back and then hits next, discard forward history (browser behavior)
+        if (historyPos < history.length - 1) {
+            history = history.slice(0, historyPos + 1);
+        }
+
+        const currentIndex = history[historyPos];
+        let nextIndex = Math.floor(Math.random() * activeQuotesCache.length);
+
+        // avoid repeating the same quote when possible
+        if (activeQuotesCache.length > 1) {
+            while (nextIndex === currentIndex) {
+            nextIndex = Math.floor(Math.random() * activeQuotesCache.length);
+            }
+        }
+
+        history.push(nextIndex);
+        historyPos++;
+
+        currentQuoteIndex = nextIndex;
+        renderDailyQuoteByIndex();
+        }
+
+        function showNextQuote() {
+        if (!activeQuotesCache.length) return;
+
+        // if there is forward history, go forward
+        if (historyPos < history.length - 1) {
+            historyPos++;
+            currentQuoteIndex = history[historyPos];
+            renderDailyQuoteByIndex();
+            return;
+        }
+
+        // otherwise generate a new random quote and append to history
+        showNextRandomQuote();
+        }
+
+        function showPreviousQuote() {
+        if (historyPos <= 0) return;
+
+        historyPos--;
+        currentQuoteIndex = history[historyPos];
+        renderDailyQuoteByIndex();
+        }
+
+        // Previous and Next Quotes Buttons (guarded so it doesn't crash the whole script)
+        const prevBtn = document.getElementById('prevQuoteBtn');
+        const nextBtn = document.getElementById('nextQuoteBtn');
+
+        if (prevBtn) prevBtn.addEventListener('click', showPreviousQuote);
+        if (nextBtn) nextBtn.addEventListener('click', showNextQuote);
+
+ 
         // Gallery Management
         async function loadGallery(filter = 'active') {
             currentFilter = filter;

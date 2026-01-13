@@ -157,6 +157,40 @@
             margin-bottom: 30px;
         }
 
+        .quote-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        }
+        
+        /* Arrow buttons */
+        .quote-arrow {
+        position: absolute;
+        background: none;
+        border: none;
+        font-size: 2rem;
+        cursor: pointer;
+        color: var(--text-secondary);
+        padding: 10px;
+        transition: color 0.2s ease;
+        }
+
+        .quote-arrow:hover {
+        color: var(--accent);
+        }
+
+        /* Left arrow */
+        .quote-arrow.left {
+        left: -60px; /* adjust spacing */
+        }
+
+        /* Right arrow */
+        .quote-arrow.right {
+        right: -60px; /* adjust spacing */
+        }
+
+
 
         /* Gallery Screen */
         .gallery-header {
