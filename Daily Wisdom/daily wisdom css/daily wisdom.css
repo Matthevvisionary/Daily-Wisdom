@@ -77,6 +77,10 @@
             padding: 40px 20px;
         }
 
+        #dailyQuoteContainer {
+            margin-bottom: 15px;
+        }
+
         .date-display {
             font-family: 'Work Sans', sans-serif;
             font-size: 0.9rem;
@@ -152,6 +156,7 @@
             color: var(--text-secondary);
             margin-bottom: 30px;
         }
+
 
         /* Gallery Screen */
         .gallery-header {
