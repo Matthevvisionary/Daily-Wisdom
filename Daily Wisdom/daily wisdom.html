@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="daily wisdom css/daily wisdom.css">
     <style>
-  
+        
     </style>
 </head>
 <body>
@@ -18,9 +18,10 @@
         <div class="home-container">
             <div class="date-display" id="currentDate"></div>
             <div id="dailyQuoteContainer"></div>
+            <button class="btn btn-primary" id="addQuoteBtn">+ Add New Quote</button>
         </div>
     </div>
-    <!-- test -->
+
     <!-- Gallery Screen -->
     <div id="galleryScreen" class="screen">
         <div class="gallery-header">
@@ -386,13 +387,15 @@
             const grid = document.getElementById('galleryGrid');
 
             if (filteredQuotes.length === 0) {
+                const icon = filter === 'deleted' ? '🗑️' : '📭';
+                
                 grid.innerHTML = `
-                    <div class="empty-state" style="grid-column: 1/-1;">
-                        <div class="empty-state-icon">📭</div>
-                        <div class="empty-state-text">No ${filter} quotes found</div>
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="empty-state-icon">${icon}</div>
+                    <div class="empty-state-text">No ${filter} quotes found</div>
                     </div>
                 `;
-                return;
+                return; 
             }
 
             // Sort by creation date, newest first
