@@ -170,7 +170,18 @@
         </div>
     </div>
 
+    <!-- Supabase client (third-party library) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <script>
+        // Supabase client initialization 
+        // Auth + RLS verified working (magic link)
+        const supabaseClient = window.supabase.createClient(
+            "https://mmchlykmezehfmtdtjff.supabase.co",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tY2hseWttZXplaGZtdGR0amZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0NDQyODEsImV4cCI6MjA4NDAyMDI4MX0.J8lPRllK2BDuuME41N4G0-fB5EMdn2ePCZZwFLamP9U"
+        );
+        console.log("Supabase ready:", supabaseClient);
+
         // Dark mode detection and setup
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.classList.add('dark');
