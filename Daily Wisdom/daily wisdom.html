@@ -182,6 +182,80 @@
         );
         console.log("Supabase ready:", supabaseClient);
 
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            console.log("Auth event:", event);
+            console.log("Session:", session);
+
+            if (session) {
+                loadQuotes(session.user.id);
+            }
+        });
+
+        async function loadQuotes(userId) {
+            const { data, error } = await supabaseClient
+                .from("quotes")
+                .select("*")
+                .eq("user_id", userId)
+                .order("created_at", { ascending: false });
+
+            if (error) {
+                console.error("Error loading quotes:", error);
+                return;
+            }
+
+            console.log("Loaded quotes:", data);
+
+            // For now just log them
+            // Later we replace your IndexedDB rendering with this
+        }
+
+        async function saveQuoteToSupabase({ text, imageFile = null }) {
+            const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
+            if (userErr) throw userErr;
+            if (!user) throw new Error("Not signed in");
+
+            let imagePath = null;
+
+            // Upload image if provided
+            if (imageFile) {
+                imagePath = await uploadQuoteImage(imageFile);
+            }
+
+            const { data, error } = await supabaseClient
+                .from("quotes")
+                .insert([{
+                    user_id: user.id,
+                    text: text || null,
+                    image_path: imagePath
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            return data;
+        }
+
+        async function uploadQuoteImage(file) {
+            const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
+            if (userErr) throw userErr;
+            if (!user) throw new Error("Not signed in");
+
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+            const filePath = `${user.id}/${fileName}`;
+
+            const { error: uploadError } = await supabaseClient.storage
+                .from('quote-images')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            return filePath;
+        }
+
+
+
         // Dark mode detection and setup
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.classList.add('dark');
@@ -582,6 +656,10 @@
         });
 
         // Add quote form submission
+            // Current app supports either:
+            // 1) text quote
+            // 2) image quote
+            // Not both together yet
         document.getElementById('addQuoteForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -606,12 +684,23 @@
                 deletedAt: null
             };
 
+             try {
+                // Save to Supabase if signed in
+                await saveQuoteToSupabase({
+                    text: text,
+                    imageFile: imageFile
+                });
+            } catch (err) {
+                console.warn("Supabase save failed:", err);
+            }
+
             await addQuote(quote);
             closeAddModal();
             loadGallery(currentFilter);
             loadDailyQuote();
             showCustomAlert('Quote added successfully!');
-        });
+            });
+
 
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
