@@ -188,6 +188,7 @@
 
             if (session) {
                 loadQuotes(session.user.id);
+                syncUnsyncedQuotes();
             }
         });
 
@@ -209,7 +210,7 @@
             // Later we replace your IndexedDB rendering with this
         }
 
-        async function saveQuoteToSupabase({ text, imageFile = null }) {
+        async function saveQuoteToSupabase({ clientId, text, imageFile = null }) {
             const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
             if (userErr) throw userErr;
             if (!user) throw new Error("Not signed in");
@@ -223,11 +224,14 @@
 
             const { data, error } = await supabaseClient
                 .from("quotes")
-                .insert([{
+                .upsert([{
+                    client_id: clientId,
                     user_id: user.id,
                     text: text || null,
                     image_path: imagePath
-                }])
+                }], {
+                    onConflict: 'client_id'
+                })
                 .select()
                 .single();
 
@@ -253,6 +257,26 @@
 
             return filePath;
         }
+
+        async function syncUnsyncedQuotes() {
+            const quotes = await getAllQuotes();
+            const unsyncedQuotes = quotes.filter(q => !q.synced && q.text);
+
+            for (const quote of unsyncedQuotes) {
+                try {
+                    await saveQuoteToSupabase({
+                        clientId: quote.client_id,
+                        text: quote.text,
+                        imageFile: null
+                    });
+
+                    await updateQuote(quote.id, { synced: true});
+                } catch (err) {
+                    console.warn("Sync failed for quote:", quote, err);
+                }
+            }
+        }
+            
 
 
 
@@ -677,22 +701,29 @@
             }
 
             const quote = {
+                client_id: crypto.randomUUID(),
                 text: text,
                 image: imageData,
                 status: 'active',
                 createdAt: Date.now(),
-                deletedAt: null
+                deletedAt: null,
+                synced: false
             };
 
-             try {
+            let cloudSaved = false;
+
+            try {
                 // Save to Supabase if signed in
                 await saveQuoteToSupabase({
-                    text: text,
+                    clientId: quote.client_id,
+                    text: quote.text,
                     imageFile: imageFile
                 });
             } catch (err) {
                 console.warn("Supabase save failed:", err);
             }
+
+           quote.synced = cloudSaved; 
 
             await addQuote(quote);
             closeAddModal();
