@@ -24,7 +24,8 @@
                 <button id="nextQuoteBtn" class="quote-arrow right">→</button>
             </div>
             <!-- Action button -->
-            <button class="btn btn-primary" id="addQuoteBtn">+ Add New Quote</button>
+            <div id="button-container">
+            </div>
         </div>
     </div>
 
@@ -482,6 +483,13 @@
             </div>
             `;
             return;
+        } else {
+            const container = document.getElementById('button-container');
+            container.innerHTML = `
+            <div class="unempty-state">
+                <button class="btn btn-primary" id="addQuoteBtn" onclick="openAddModal()">+ Add New Quote</button>   
+            </div>
+            `;
         }
 
         activeQuotesCache = activeQuotes;
@@ -719,6 +727,8 @@
                     text: quote.text,
                     imageFile: imageFile
                 });
+                
+                cloudSaved = true;
             } catch (err) {
                 console.warn("Supabase save failed:", err);
             }
