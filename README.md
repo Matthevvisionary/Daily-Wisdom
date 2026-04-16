@@ -1,5 +1,5 @@
 # Daily Wisdom – Full-Stack Quote Platform
-
+![App Screenshot](assets/Daily Wisdom Preview.png)
 A full-stack quote application that allows users to create, store, and manage personal quotes with authentication and cloud synchronization.
 
 ## 🚀 Features
