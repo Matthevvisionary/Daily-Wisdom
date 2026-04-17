@@ -355,7 +355,8 @@
                     const quote = getRequest.result;
                     Object.assign(quote, updates);
                     const updateRequest = store.put(quote);
-                    updateRequest.onsuccess = () => resolve();
+                    transaction.oncomplete = () => resolve();
+                    transaction.onerror = () => reject(transaction.error);
                     updateRequest.onerror = () => reject(updateRequest.error);
                 };
                 getRequest.onerror = () => reject(getRequest.error);
@@ -472,25 +473,33 @@
         const quotes = await getAllQuotes();
         const activeQuotes = quotes.filter(q => q.status === 'active');
 
-        const container = document.getElementById('dailyQuoteContainer');
+        const quoteContainer = document.getElementById('dailyQuoteContainer');
+        const buttonContainer = document.getElementById('button-container');
 
         if (activeQuotes.length === 0) {
-            container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">✨</div>
-                <div class="empty-state-text">No quotes yet. Add your first quote to get started!</div>
-                <button class="btn btn-primary" onclick="openAddModal()">Add Your First Quote</button>
-            </div>
+            quoteContainer.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">✨</div>
+                    <div class="empty-state-text">
+                        No quotes yet. Add your first quote to get started!
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddModal()">
+                        Add Your First Quote
+                    </button>
+                </div>
             `;
+
+            buttonContainer.innerHTML = ''; // 🔥 THIS WAS MISSING
             return;
-        } else {
-            const container = document.getElementById('button-container');
-            container.innerHTML = `
-            <div class="unempty-state">
-                <button class="btn btn-primary" id="addQuoteBtn" onclick="openAddModal()">+ Add New Quote</button>   
-            </div>
-            `;
         }
+
+        buttonContainer.innerHTML = `
+            <div class="unempty-state">
+                <button class="btn btn-primary" id="addQuoteBtn" onclick="openAddModal()">
+                    + Add New Quote
+                </button>
+            </div>
+        `;
 
         activeQuotesCache = activeQuotes;
 
