@@ -198,7 +198,7 @@
                 .from("quotes")
                 .select("*")
                 .eq("user_id", userId)
-                .order("created_at", { ascending: false });
+                .order("createdAt", { ascending: false });
 
             if (error) {
                 console.error("Error loading quotes:", error);
@@ -207,8 +207,6 @@
 
             console.log("Loaded quotes:", data);
 
-            // For now just log them
-            // Later we replace your IndexedDB rendering with this
         }
 
         async function saveQuoteToSupabase({ clientId, text, imageFile = null }) {
@@ -241,6 +239,54 @@
             return data;
         }
 
+        async function softDeleteQuotesInSupabase(clientIds) {
+            const { data: authData } = await supabaseClient.auth.getUser();
+            const user = authData.user;
+
+            if (!user || clientIds.length === 0) return;
+
+            const { data: updatedata, error } = await supabaseClient
+                .from('quotes')
+                .update({
+                    status: 'deleted',
+                    deletedAt: new Date().toISOString()
+                })
+                .eq('user_id', user.id)
+                .in('client_id', clientIds)
+                .select();
+
+            // console.log('user object:', user);
+            // console.log('user.id:', user.id);
+            // console.log('clientIds:', clientIds);
+            // console.log('soft delete updateData:', updatedata);
+            // console.log('soft delete error:', error);
+
+            if (error) {
+                console.error('Supabase soft delete failed:', error);
+                throw error;
+            }
+        }
+
+        async function softDeleteQuoteInSupabase(clientId) {
+            return softDeleteQuotesInSupabase([clientId]);
+        }
+
+        async function permanentlyDeleteQuoteFromSupabase(clientId) {
+            const user = await getCurrentUser();
+            if (!user) return;
+
+            const { error } = await supabaseClient
+                .from('quotes')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('client_id', clientId);
+
+            if (error) {
+                console.error('Supabase permanent delete failed:', error);
+                throw error;
+            }
+        }
+
         async function uploadQuoteImage(file) {
             const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
             if (userErr) throw userErr;
@@ -261,17 +307,47 @@
 
         async function syncUnsyncedQuotes() {
             const quotes = await getAllQuotes();
-            const unsyncedQuotes = quotes.filter(q => !q.synced && q.text);
+            const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+
+            const unsyncedQuotes = quotes.filter(q => !q.synced);
 
             for (const quote of unsyncedQuotes) {
                 try {
+                    if (!navigator.onLine) break;
+
+                    // 🔥 CASE 1: deleted quote
+                    if (quote.status === 'deleted') {
+
+                        const isExpired = quote.deletedAt && quote.deletedAt < thirtyDaysAgo;
+
+                        // 🔥 CASE 1A: expired → permanent delete
+                        if (isExpired) {
+                            if (quote.client_id) {
+                                await permanentlyDeleteQuoteFromSupabase(quote.client_id);
+                            }
+
+                            await deleteQuote(quote.id);
+                            continue; // move to next quote
+                        }
+
+                        // 🔥 CASE 1B: still within 30 days → soft delete
+                        if (quote.client_id) {
+                            await softDeleteQuoteInSupabase(quote.client_id);
+                        }
+
+                        await updateQuote(quote.id, { synced: true });
+                        continue;
+                    }
+
+                    // 🔥 CASE 2: active quote → normal sync
                     await saveQuoteToSupabase({
                         clientId: quote.client_id,
                         text: quote.text,
                         imageFile: null
                     });
 
-                    await updateQuote(quote.id, { synced: true});
+                    await updateQuote(quote.id, { synced: true });
+
                 } catch (err) {
                     console.warn("Sync failed for quote:", quote, err);
                 }
@@ -783,9 +859,28 @@
                 : `Delete ${selectedQuotes.size} quote(s)? They will be moved to trash for 30 days.`;
 
             showCustomConfirm(message, async () => {
+                const quotes = await getAllQuotes();
+
                 for (const id of selectedQuotes) {
-                    await updateQuote(id, { status: 'deleted', deletedAt: Date.now() });
+                    const quote = quotes.find(q => q.id === id);
+
+                    await updateQuote(id, { 
+                        status: 'deleted', 
+                        deletedAt: Date.now(),
+                        synced: false
+                    });
+
+                    try {
+                        if (navigator.onLine && quote?.client_id) {
+                            await softDeleteQuoteInSupabase(quote.client_id);
+
+                            await updateQuote(id, { synced: true });
+                        }
+                    } catch (err) {
+                        console.warn('Soft delete sync failed, will retry later:', err);
+                    }
                 }
+
                 selectedQuotes.clear();
                 loadGallery(currentFilter);
                 loadDailyQuote();
@@ -909,8 +1004,26 @@
             const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
 
             for (const quote of quotes) {
-                if (quote.status === 'deleted' && quote.deletedAt && quote.deletedAt < thirtyDaysAgo) {
-                    await deleteQuote(quote.id);
+                if (
+                    quote.status === 'deleted' &&
+                    quote.deletedAt &&
+                    quote.deletedAt < thirtyDaysAgo
+                ) {
+                    try {
+                        // 🧠 Step 1: delete from Supabase FIRST
+                        if (navigator.onLine && quote.client_id) {
+                            await permanentlyDeleteQuoteFromSupabase(quote.client_id);
+                        } else {
+                            // ❗ IMPORTANT: skip if offline to avoid desync
+                            continue;
+                        }
+
+                        // 🧠 Step 2: delete locally AFTER success
+                        await deleteQuote(quote.id);
+
+                    } catch (err) {
+                        console.warn('Failed to permanently delete expired quote:', err);
+                    }
                 }
             }
         }

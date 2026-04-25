@@ -1,5 +1,5 @@
 get rid of extra quote button (maybe add if statement?) ✅
-delete button does not get rid of the quote in supabase
+delete button does not get rid of the quote in supabase ✅
 edit quote option
 add author form
 search by author?
