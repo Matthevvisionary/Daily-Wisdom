@@ -1,0 +1,770 @@
+// @ts-nocheck
+// Supabase client initialization 
+// Auth + RLS verified working (magic link)
+const supabaseClient = window.supabase.createClient("https://mmchlykmezehfmtdtjff.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tY2hseWttZXplaGZtdGR0amZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0NDQyODEsImV4cCI6MjA4NDAyMDI4MX0.J8lPRllK2BDuuME41N4G0-fB5EMdn2ePCZZwFLamP9U");
+console.log("Supabase ready:", supabaseClient);
+supabaseClient.auth.onAuthStateChange((event, session) => {
+    console.log("Auth event:", event);
+    console.log("Session:", session);
+    if (session) {
+        loadQuotes(session.user.id);
+        syncUnsyncedQuotes();
+    }
+});
+async function loadQuotes(userId) {
+    const { data, error } = await supabaseClient
+        .from("quotes")
+        .select("*")
+        .eq("user_id", userId)
+        .order("createdAt", { ascending: false });
+    if (error) {
+        console.error("Error loading quotes:", error);
+        return;
+    }
+    console.log("Loaded quotes:", data);
+}
+async function saveQuoteToSupabase({ clientId, text, imageFile = null }) {
+    const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
+    if (userErr)
+        throw userErr;
+    if (!user)
+        throw new Error("Not signed in");
+    let imagePath = null;
+    // Upload image if provided
+    if (imageFile) {
+        imagePath = await uploadQuoteImage(imageFile);
+    }
+    const { data, error } = await supabaseClient
+        .from("quotes")
+        .upsert([{
+            client_id: clientId,
+            user_id: user.id,
+            text: text || null,
+            image_path: imagePath
+        }], {
+        onConflict: 'client_id'
+    })
+        .select()
+        .single();
+    if (error)
+        throw error;
+    return data;
+}
+async function softDeleteQuotesInSupabase(clientIds) {
+    const { data: authData } = await supabaseClient.auth.getUser();
+    const user = authData.user;
+    if (!user || clientIds.length === 0)
+        return;
+    const { data: updatedata, error } = await supabaseClient
+        .from('quotes')
+        .update({
+        status: 'deleted',
+        deletedAt: new Date().toISOString()
+    })
+        .eq('user_id', user.id)
+        .in('client_id', clientIds)
+        .select();
+    // console.log('user object:', user);
+    // console.log('user.id:', user.id);
+    // console.log('clientIds:', clientIds);
+    // console.log('soft delete updateData:', updatedata);
+    // console.log('soft delete error:', error);
+    if (error) {
+        console.error('Supabase soft delete failed:', error);
+        throw error;
+    }
+}
+async function softDeleteQuoteInSupabase(clientId) {
+    return softDeleteQuotesInSupabase([clientId]);
+}
+async function getCurrentUser() {
+    const { data, error } = await supabaseClient.auth.getUser();
+    if (error)
+        throw error;
+    return data.user;
+}
+async function permanentlyDeleteQuoteFromSupabase(clientId) {
+    const user = await getCurrentUser();
+    if (!user)
+        return;
+    const { error } = await supabaseClient
+        .from('quotes')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('client_id', clientId);
+    if (error) {
+        console.error('Supabase permanent delete failed:', error);
+        throw error;
+    }
+}
+async function uploadQuoteImage(file) {
+    const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
+    if (userErr)
+        throw userErr;
+    if (!user)
+        throw new Error("Not signed in");
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+    const { error: uploadError } = await supabaseClient.storage
+        .from('quote-images')
+        .upload(filePath, file);
+    if (uploadError)
+        throw uploadError;
+    return filePath;
+}
+async function syncUnsyncedQuotes() {
+    const quotes = await getAllQuotes();
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const unsyncedQuotes = quotes.filter(q => !q.synced);
+    for (const quote of unsyncedQuotes) {
+        try {
+            if (!navigator.onLine)
+                break;
+            // 🔥 CASE 1: deleted quote
+            if (quote.status === 'deleted') {
+                const isExpired = quote.deletedAt && quote.deletedAt < thirtyDaysAgo;
+                // 🔥 CASE 1A: expired → permanent delete
+                if (isExpired) {
+                    if (quote.client_id) {
+                        await permanentlyDeleteQuoteFromSupabase(quote.client_id);
+                    }
+                    await deleteQuote(quote.id);
+                    continue; // move to next quote
+                }
+                // 🔥 CASE 1B: still within 30 days → soft delete
+                if (quote.client_id) {
+                    await softDeleteQuoteInSupabase(quote.client_id);
+                }
+                await updateQuote(quote.id, { synced: true });
+                continue;
+            }
+            // 🔥 CASE 2: active quote → normal sync
+            await saveQuoteToSupabase({
+                clientId: quote.client_id,
+                text: quote.text,
+                imageFile: null
+            });
+            await updateQuote(quote.id, { synced: true });
+        }
+        catch (err) {
+            console.warn("Sync failed for quote:", quote, err);
+        }
+    }
+}
+// Dark mode detection and setup
+if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.classList.add('dark');
+    document.getElementById('darkModeToggle').checked = true;
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+    if (event.matches) {
+        document.documentElement.classList.add('dark');
+        document.getElementById('darkModeToggle').checked = true;
+    }
+    else {
+        document.documentElement.classList.remove('dark');
+        document.getElementById('darkModeToggle').checked = false;
+    }
+});
+// IndexedDB Setup
+let db;
+const DB_NAME = 'DailyWisdomDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'quotes';
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            db = request.result;
+            resolve(db);
+        };
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                objectStore.createIndex('status', 'status', { unique: false });
+                objectStore.createIndex('createdAt', 'createdAt', { unique: false });
+                objectStore.createIndex('deletedAt', 'deletedAt', { unique: false });
+            }
+        };
+    });
+}
+// Database operations
+function addQuote(quote) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.add(quote);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+function getAllQuotes() {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+function updateQuote(id, updates) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const getRequest = store.get(id);
+        getRequest.onsuccess = () => {
+            const quote = getRequest.result;
+            Object.assign(quote, updates);
+            const updateRequest = store.put(quote);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+            updateRequest.onerror = () => reject(updateRequest.error);
+        };
+        getRequest.onerror = () => reject(getRequest.error);
+    });
+}
+function deleteQuote(id) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+function clearAllData() {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+// State management
+let selectedQuotes = new Set();
+let currentFilter = 'active';
+// Navigation
+function switchScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
+    document.getElementById(screenId).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    event.target.closest('.nav-item').classList.add('active');
+    // Load screen data
+    if (screenId === 'homeScreen') {
+        loadDailyQuote();
+    }
+    else if (screenId === 'galleryScreen') {
+        loadGallery(currentFilter);
+    }
+    else if (screenId === 'settingsScreen') {
+        updateSettingsStats();
+    }
+}
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        const screenId = item.dataset.screen;
+        switchScreen(screenId);
+    });
+});
+// Date formatting
+function formatDate(date) {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(date).toLocaleDateString('en-US', options);
+}
+function formatDateShort(date) {
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(date).toLocaleDateString('en-US', options);
+}
+// Display current date
+document.getElementById('currentDate').textContent = formatDate(new Date());
+// Daily Quote Logic
+let activeQuotesCache = [];
+let currentQuoteIndex = 0;
+let quoteHistory = []; // stores indexes you’ve visited, in order
+let historyPos = -1; // where you currently are in quoteHistory
+function renderDailyQuoteByIndex() {
+    const container = document.getElementById('dailyQuoteContainer');
+    const dailyQuote = activeQuotesCache[currentQuoteIndex];
+    // safety guard (shouldn't happen, but prevents crashes)
+    if (!dailyQuote)
+        return;
+    let quoteHTML = '<div class="quote-card">';
+    if (dailyQuote.image) {
+        quoteHTML += `<img src="${dailyQuote.image}" alt="Quote image" class="quote-image">`;
+    }
+    if (dailyQuote.text) {
+        quoteHTML += `<div class="quote-text">${dailyQuote.text}</div>`;
+    }
+    quoteHTML += `<div class="quote-meta">Added ${formatDateShort(dailyQuote.createdAt)}</div>`;
+    quoteHTML += `</div>`;
+    container.innerHTML = quoteHTML;
+}
+function getDailyQuoteSeed() {
+    const today = new Date();
+    return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+}
+function seededRandom(seed) {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+}
+async function loadDailyQuote() {
+    const quotes = await getAllQuotes();
+    const activeQuotes = quotes.filter(q => q.status === 'active');
+    const quoteContainer = document.getElementById('dailyQuoteContainer');
+    const buttonContainer = document.getElementById('button-container');
+    if (activeQuotes.length === 0) {
+        quoteContainer.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">✨</div>
+                    <div class="empty-state-text">
+                        No quotes yet. Add your first quote to get started!
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddModal()">
+                        Add Your First Quote
+                    </button>
+                </div>
+            `;
+        buttonContainer.innerHTML = ''; // 🔥 THIS WAS MISSING
+        return;
+    }
+    buttonContainer.innerHTML = `
+            <div class="unempty-state">
+                <button class="btn btn-primary" id="addQuoteBtn" onclick="openAddModal()">
+                    + Add New Quote
+                </button>
+            </div>
+        `;
+    activeQuotesCache = activeQuotes;
+    // pick today's starting quote (seeded)
+    const seed = getDailyQuoteSeed();
+    currentQuoteIndex = Math.floor(seededRandom(seed) * activeQuotesCache.length);
+    // initialize shuffle quoteHistory starting at today's quote
+    quoteHistory = [currentQuoteIndex];
+    historyPos = 0;
+    renderDailyQuoteByIndex();
+}
+function showNextRandomQuote() {
+    if (!activeQuotesCache.length)
+        return;
+    // if user went back and then hits next, discard forward quoteHistory (browser behavior)
+    if (historyPos < quoteHistory.length - 1) {
+        quoteHistory = quoteHistory.slice(0, historyPos + 1);
+    }
+    const currentIndex = quoteHistory[historyPos];
+    let nextIndex = Math.floor(Math.random() * activeQuotesCache.length);
+    // avoid repeating the same quote when possible
+    if (activeQuotesCache.length > 1) {
+        while (nextIndex === currentIndex) {
+            nextIndex = Math.floor(Math.random() * activeQuotesCache.length);
+        }
+    }
+    quoteHistory.push(nextIndex);
+    historyPos++;
+    currentQuoteIndex = nextIndex;
+    renderDailyQuoteByIndex();
+}
+function showNextQuote() {
+    if (!activeQuotesCache.length)
+        return;
+    // if there is forward quoteHistory, go forward
+    if (historyPos < quoteHistory.length - 1) {
+        historyPos++;
+        currentQuoteIndex = quoteHistory[historyPos];
+        renderDailyQuoteByIndex();
+        return;
+    }
+    // otherwise generate a new random quote and append to quoteHistory
+    showNextRandomQuote();
+}
+function showPreviousQuote() {
+    if (historyPos <= 0)
+        return;
+    historyPos--;
+    currentQuoteIndex = quoteHistory[historyPos];
+    renderDailyQuoteByIndex();
+}
+// Previous and Next Quotes Buttons (guarded so it doesn't crash the whole script)
+const prevBtn = document.getElementById('prevQuoteBtn');
+const nextBtn = document.getElementById('nextQuoteBtn');
+if (prevBtn)
+    prevBtn.addEventListener('click', showPreviousQuote);
+if (nextBtn)
+    nextBtn.addEventListener('click', showNextQuote);
+// Gallery Management
+async function loadGallery(filter = 'active') {
+    currentFilter = filter;
+    selectedQuotes.clear();
+    updateSelectionUI();
+    const quotes = await getAllQuotes();
+    let filteredQuotes = [];
+    if (filter === 'active') {
+        filteredQuotes = quotes.filter(q => q.status === 'active');
+    }
+    else if (filter === 'archived') {
+        filteredQuotes = quotes.filter(q => q.status === 'archived');
+    }
+    else if (filter === 'deleted') {
+        // Show deleted items that haven't expired (within 30 days)
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        filteredQuotes = quotes.filter(q => {
+            if (q.status === 'deleted' && q.deletedAt) {
+                return q.deletedAt > thirtyDaysAgo;
+            }
+            return false;
+        });
+    }
+    const grid = document.getElementById('galleryGrid');
+    if (filteredQuotes.length === 0) {
+        const icon = filter === 'deleted' ? '🗑️' : '📭';
+        grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                    <div class="empty-state-icon">${icon}</div>
+                    <div class="empty-state-text">No ${filter} quotes found</div>
+                    </div>
+                `;
+        return;
+    }
+    // Sort by creation date, newest first
+    filteredQuotes.sort((a, b) => b.createdAt - a.createdAt);
+    grid.innerHTML = filteredQuotes.map(quote => `
+                <div class="gallery-item" data-id="${quote.id}">
+                    <div class="selection-indicator">✓</div>
+                    ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
+                    <div class="gallery-item-content">
+                        ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
+                        <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
+                    </div>
+                </div>
+            `).join('');
+    // Add click handlers for selection
+    document.querySelectorAll('.gallery-item').forEach(item => {
+        item.addEventListener('click', toggleSelection);
+    });
+}
+function toggleSelection(e) {
+    const item = e.currentTarget;
+    const id = parseInt(item.dataset.id);
+    if (selectedQuotes.has(id)) {
+        selectedQuotes.delete(id);
+        item.classList.remove('selected');
+    }
+    else {
+        selectedQuotes.add(id);
+        item.classList.add('selected');
+    }
+    updateSelectionUI();
+}
+function updateSelectionUI() {
+    const hasSelection = selectedQuotes.size > 0;
+    document.getElementById('archiveSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter !== 'active');
+    document.getElementById('deleteSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter === 'deleted');
+    document.getElementById('recoverSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter !== 'deleted');
+    document.getElementById('cancelSelectionBtn').classList.toggle('hidden', !hasSelection);
+}
+// Filter tabs
+document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+        document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        loadGallery(tab.dataset.filter);
+    });
+});
+// Add quote modal
+function openAddModal() {
+    document.getElementById('addQuoteModal').classList.add('active');
+    document.getElementById('quoteText').value = '';
+    document.getElementById('quoteImage').value = '';
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('imagePreview').classList.add('hidden');
+}
+function closeAddModal() {
+    document.getElementById('addQuoteModal').classList.remove('active');
+}
+document.getElementById('addQuoteBtn').addEventListener('click', openAddModal);
+document.getElementById('closeAddModal').addEventListener('click', closeAddModal);
+document.getElementById('cancelAddBtn').addEventListener('click', closeAddModal);
+// File upload
+document.getElementById('fileUploadArea').addEventListener('click', () => {
+    document.getElementById('quoteImage').click();
+});
+document.getElementById('quoteImage').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = document.getElementById('imagePreview');
+            preview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+            preview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+});
+// Add quote form submission
+// Current app supports either:
+// 1) text quote
+// 2) image quote
+// Not both together yet
+document.getElementById('addQuoteForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = document.getElementById('quoteText').value.trim();
+    const imageFile = document.getElementById('quoteImage').files[0];
+    if (!text && !imageFile) {
+        showCustomAlert('Please add either text or an image');
+        return;
+    }
+    let imageData = null;
+    if (imageFile) {
+        imageData = await fileToBase64(imageFile);
+    }
+    const quote = {
+        client_id: crypto.randomUUID(),
+        text: text,
+        image: imageData,
+        status: 'active',
+        createdAt: Date.now(),
+        deletedAt: null,
+        synced: false
+    };
+    let cloudSaved = false;
+    try {
+        // Save to Supabase if signed in
+        await saveQuoteToSupabase({
+            clientId: quote.client_id,
+            text: quote.text,
+            imageFile: imageFile
+        });
+        cloudSaved = true;
+    }
+    catch (err) {
+        console.warn("Supabase save failed:", err);
+    }
+    quote.synced = cloudSaved;
+    await addQuote(quote);
+    closeAddModal();
+    loadGallery(currentFilter);
+    loadDailyQuote();
+    showCustomAlert('Quote added successfully!');
+});
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+// Gallery actions
+document.getElementById('archiveSelectedBtn').addEventListener('click', async () => {
+    if (selectedQuotes.size === 0)
+        return;
+    showCustomConfirm(`Archive ${selectedQuotes.size} quote(s)?`, async () => {
+        for (const id of selectedQuotes) {
+            await updateQuote(id, { status: 'archived' });
+        }
+        selectedQuotes.clear();
+        loadGallery(currentFilter);
+        loadDailyQuote();
+    });
+});
+document.getElementById('deleteSelectedBtn').addEventListener('click', async () => {
+    if (selectedQuotes.size === 0)
+        return;
+    const message = currentFilter === 'archived'
+        ? `Move ${selectedQuotes.size} quote(s) to trash? They will be permanently deleted after 30 days.`
+        : `Delete ${selectedQuotes.size} quote(s)? They will be moved to trash for 30 days.`;
+    showCustomConfirm(message, async () => {
+        const quotes = await getAllQuotes();
+        for (const id of selectedQuotes) {
+            const quote = quotes.find(q => q.id === id);
+            await updateQuote(id, {
+                status: 'deleted',
+                deletedAt: Date.now(),
+                synced: false
+            });
+            try {
+                if (navigator.onLine && quote?.client_id) {
+                    await softDeleteQuoteInSupabase(quote.client_id);
+                    await updateQuote(id, { synced: true });
+                }
+            }
+            catch (err) {
+                console.warn('Soft delete sync failed, will retry later:', err);
+            }
+        }
+        selectedQuotes.clear();
+        loadGallery(currentFilter);
+        loadDailyQuote();
+    });
+});
+document.getElementById('recoverSelectedBtn').addEventListener('click', async () => {
+    if (selectedQuotes.size === 0)
+        return;
+    for (const id of selectedQuotes) {
+        await updateQuote(id, { status: 'active', deletedAt: null });
+    }
+    selectedQuotes.clear();
+    loadGallery(currentFilter);
+    loadDailyQuote();
+    showCustomAlert('Quote(s) recovered successfully!');
+});
+document.getElementById('cancelSelectionBtn').addEventListener('click', () => {
+    selectedQuotes.clear();
+    document.querySelectorAll('.gallery-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    updateSelectionUI();
+});
+// Search functionality
+let searchTimeout;
+document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(performSearch, 300);
+});
+document.getElementById('searchFromDate').addEventListener('change', performSearch);
+document.getElementById('searchToDate').addEventListener('change', performSearch);
+async function performSearch() {
+    const keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+    const fromDate = document.getElementById('searchFromDate').value;
+    const toDate = document.getElementById('searchToDate').value;
+    let quotes = await getAllQuotes();
+    quotes = quotes.filter(q => q.status === 'active');
+    // Filter by keyword
+    if (keyword) {
+        quotes = quotes.filter(q => q.text && q.text.toLowerCase().includes(keyword));
+    }
+    // Filter by date range
+    if (fromDate) {
+        const fromTime = new Date(fromDate).getTime();
+        quotes = quotes.filter(q => q.createdAt >= fromTime);
+    }
+    if (toDate) {
+        const toTime = new Date(toDate).getTime() + (24 * 60 * 60 * 1000) - 1;
+        quotes = quotes.filter(q => q.createdAt <= toTime);
+    }
+    // Sort by relevance (most recent first)
+    quotes.sort((a, b) => b.createdAt - a.createdAt);
+    // Display results
+    const resultsCount = document.getElementById('searchResultsCount');
+    const resultsGrid = document.getElementById('searchResultsGrid');
+    resultsCount.textContent = `${quotes.length} result${quotes.length !== 1 ? 's' : ''} found`;
+    if (quotes.length === 0) {
+        resultsGrid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <div class="empty-state-icon">🔍</div>
+                        <div class="empty-state-text">No quotes match your search</div>
+                    </div>
+                `;
+        return;
+    }
+    resultsGrid.innerHTML = quotes.map(quote => `
+                <div class="gallery-item">
+                    ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
+                    <div class="gallery-item-content">
+                        ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
+                        <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
+                    </div>
+                </div>
+            `).join('');
+}
+// Settings
+document.getElementById('darkModeToggle').addEventListener('change', (e) => {
+    if (e.target.checked) {
+        document.documentElement.classList.add('dark');
+    }
+    else {
+        document.documentElement.classList.remove('dark');
+    }
+});
+async function updateSettingsStats() {
+    const quotes = await getAllQuotes();
+    const activeQuotes = quotes.filter(q => q.status === 'active');
+    document.getElementById('totalQuotesCount').textContent =
+        `${activeQuotes.length} quote${activeQuotes.length !== 1 ? 's' : ''} in collection`;
+}
+document.getElementById('clearDataBtn').addEventListener('click', () => {
+    showCustomConfirm('Are you sure you want to permanently delete all quotes? This action cannot be undone.', async () => {
+        await clearAllData();
+        loadGallery(currentFilter);
+        loadDailyQuote();
+        updateSettingsStats();
+        showCustomAlert('All data has been cleared');
+    });
+});
+// Cleanup expired deleted quotes on app load
+async function cleanupExpiredQuotes() {
+    const quotes = await getAllQuotes();
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    for (const quote of quotes) {
+        if (quote.status === 'deleted' &&
+            quote.deletedAt &&
+            quote.deletedAt < thirtyDaysAgo) {
+            try {
+                // 🧠 Step 1: delete from Supabase FIRST
+                if (navigator.onLine && quote.client_id) {
+                    await permanentlyDeleteQuoteFromSupabase(quote.client_id);
+                }
+                else {
+                    // ❗ IMPORTANT: skip if offline to avoid desync
+                    continue;
+                }
+                // 🧠 Step 2: delete locally AFTER success
+                await deleteQuote(quote.id);
+            }
+            catch (err) {
+                console.warn('Failed to permanently delete expired quote:', err);
+            }
+        }
+    }
+}
+// Custom alert/confirm dialogs
+function showCustomAlert(message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Notice</h2>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">${message}</p>
+                    <button class="btn btn-primary" style="width: 100%;" onclick="this.closest('.modal').remove()">OK</button>
+                </div>
+            `;
+    document.body.appendChild(modal);
+}
+function showCustomConfirm(message, onConfirm) {
+    const modal = document.createElement('div');
+    modal.className = 'modal active';
+    modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Confirm</h2>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">${message}</p>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" style="flex: 1;" onclick="this.closest('.modal').remove()">Cancel</button>
+                        <button class="btn btn-primary confirm-btn" style="flex: 1;">Confirm</button>
+                    </div>
+                </div>
+            `;
+    document.body.appendChild(modal);
+    modal.querySelector('.confirm-btn').addEventListener('click', () => {
+        modal.remove();
+        onConfirm();
+    });
+}
+// Initialize app
+async function initApp() {
+    await initDB();
+    await cleanupExpiredQuotes();
+    await loadDailyQuote();
+    await updateSettingsStats();
+}
+initApp();

@@ -12,11 +12,25 @@ A full-stack quote application that allows users to create, store, and manage pe
 
 ## 🛠️ Tech Stack
 
-* JavaScript
+* TypeScript
 * Supabase (Auth, Database, Storage)
 * PostgreSQL
 * IndexedDB
 * HTML/CSS
+
+## Build
+
+Install dependencies once:
+
+```bash
+npm install
+```
+
+Compile TypeScript:
+
+```bash
+npm run build
+```
 
 ## ⚡ Key Concepts
 
