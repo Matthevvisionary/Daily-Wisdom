@@ -537,7 +537,7 @@
                     ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
                     <div class="gallery-item-content">
                         ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
-                        ${quote.creator ? `<div class="gallery-item-creator">— ${quote.creator}</div>` : ''}
+                        ${quote.creator ? `<div class="gallery-item-creator">- ${quote.creator}</div>` : ''}
                         ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
                         <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
                     </div>
