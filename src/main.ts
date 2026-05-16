@@ -34,7 +34,7 @@
 
         }
 
-        async function saveQuoteToSupabase({ clientId, text, imageFile = null }) {
+        async function saveQuoteToSupabase({ clientId, text, creator = null, source = null, imageFile = null }) {
             const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
             if (userErr) throw userErr;
             if (!user) throw new Error("Not signed in");
@@ -52,7 +52,9 @@
                     client_id: clientId,
                     user_id: user.id,
                     text: text || null,
-                    image_path: imagePath
+                    image_path: imagePath,
+                    creator: creator || null,
+                    source: source || null
                 }], {
                     onConflict: 'client_id'
                 })
@@ -174,6 +176,8 @@
                     await saveQuoteToSupabase({
                         clientId: quote.client_id,
                         text: quote.text,
+                        creator: quote.creator,
+                        source: quote.source,
                         imageFile: null
                     });
 
@@ -360,6 +364,15 @@
             quoteHTML += `<div class="quote-text">${dailyQuote.text}</div>`;
         }
 
+        if (dailyQuote.creator) {
+            quoteHTML += `<div class="quote-creator">— ${dailyQuote.creator}</div>`;
+        }
+
+        if (dailyQuote.source) {
+            quoteHTML += `<div class="quote-source">${dailyQuote.source}</div>`;
+        }
+
+
         quoteHTML += `<div class="quote-meta">Added ${formatDateShort(dailyQuote.createdAt)}</div>`;
         quoteHTML += `</div>`;
 
@@ -524,6 +537,8 @@
                     ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
                     <div class="gallery-item-content">
                         ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
+                        ${quote.creator ? `<div class="gallery-item-creator">— ${quote.creator}</div>` : ''}
+                        ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
                         <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
                     </div>
                 </div>
@@ -572,6 +587,8 @@
         function openAddModal() {
             document.getElementById('addQuoteModal').classList.add('active');
             document.getElementById('quoteText').value = '';
+            document.getElementById('quoteCreator').value = '';
+            document.getElementById('quoteSource').value = '';
             document.getElementById('quoteImage').value = '';
             document.getElementById('imagePreview').innerHTML = '';
             document.getElementById('imagePreview').classList.add('hidden');
@@ -612,6 +629,8 @@
             e.preventDefault();
 
             const text = document.getElementById('quoteText').value.trim();
+            const creator = document.getElementById('quoteCreator').value.trim();
+            const source = document.getElementById('quoteSource').value.trim();
             const imageFile = document.getElementById('quoteImage').files[0];
 
             if (!text && !imageFile) {
@@ -627,12 +646,15 @@
             const quote = {
                 client_id: crypto.randomUUID(),
                 text: text,
+                creator: creator || null,
+                source: source || null,
                 image: imageData,
                 status: 'active',
                 createdAt: Date.now(),
                 deletedAt: null,
                 synced: false
             };
+
 
             let cloudSaved = false;
 
@@ -641,6 +663,8 @@
                 await saveQuoteToSupabase({
                     clientId: quote.client_id,
                     text: quote.text,
+                    creator: quote.creator,
+                    source: quote.source,
                     imageFile: imageFile
                 });
                 
@@ -907,5 +931,3 @@
         }
 
         initApp();
-
-

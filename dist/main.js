@@ -23,7 +23,7 @@ async function loadQuotes(userId) {
     }
     console.log("Loaded quotes:", data);
 }
-async function saveQuoteToSupabase({ clientId, text, imageFile = null }) {
+async function saveQuoteToSupabase({ clientId, text, creator = null, source = null, imageFile = null }) {
     const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
     if (userErr)
         throw userErr;
@@ -40,7 +40,9 @@ async function saveQuoteToSupabase({ clientId, text, imageFile = null }) {
             client_id: clientId,
             user_id: user.id,
             text: text || null,
-            image_path: imagePath
+            image_path: imagePath,
+            creator: creator || null,
+            source: source || null
         }], {
         onConflict: 'client_id'
     })
@@ -143,6 +145,8 @@ async function syncUnsyncedQuotes() {
             await saveQuoteToSupabase({
                 clientId: quote.client_id,
                 text: quote.text,
+                creator: quote.creator,
+                source: quote.source,
                 imageFile: null
             });
             await updateQuote(quote.id, { synced: true });
@@ -303,6 +307,12 @@ function renderDailyQuoteByIndex() {
     if (dailyQuote.text) {
         quoteHTML += `<div class="quote-text">${dailyQuote.text}</div>`;
     }
+    if (dailyQuote.creator) {
+        quoteHTML += `<div class="quote-creator">— ${dailyQuote.creator}</div>`;
+    }
+    if (dailyQuote.source) {
+        quoteHTML += `<div class="quote-source">${dailyQuote.source}</div>`;
+    }
     quoteHTML += `<div class="quote-meta">Added ${formatDateShort(dailyQuote.createdAt)}</div>`;
     quoteHTML += `</div>`;
     container.innerHTML = quoteHTML;
@@ -440,6 +450,8 @@ async function loadGallery(filter = 'active') {
                     ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
                     <div class="gallery-item-content">
                         ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
+                        ${quote.creator ? `<div class="gallery-item-creator">— ${quote.creator}</div>` : ''}
+                        ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
                         <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
                     </div>
                 </div>
@@ -481,6 +493,8 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
 function openAddModal() {
     document.getElementById('addQuoteModal').classList.add('active');
     document.getElementById('quoteText').value = '';
+    document.getElementById('quoteCreator').value = '';
+    document.getElementById('quoteSource').value = '';
     document.getElementById('quoteImage').value = '';
     document.getElementById('imagePreview').innerHTML = '';
     document.getElementById('imagePreview').classList.add('hidden');
@@ -515,6 +529,8 @@ document.getElementById('quoteImage').addEventListener('change', (e) => {
 document.getElementById('addQuoteForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = document.getElementById('quoteText').value.trim();
+    const creator = document.getElementById('quoteCreator').value.trim();
+    const source = document.getElementById('quoteSource').value.trim();
     const imageFile = document.getElementById('quoteImage').files[0];
     if (!text && !imageFile) {
         showCustomAlert('Please add either text or an image');
@@ -527,6 +543,8 @@ document.getElementById('addQuoteForm').addEventListener('submit', async (e) => 
     const quote = {
         client_id: crypto.randomUUID(),
         text: text,
+        creator: creator || null,
+        source: source || null,
         image: imageData,
         status: 'active',
         createdAt: Date.now(),
@@ -539,6 +557,8 @@ document.getElementById('addQuoteForm').addEventListener('submit', async (e) => 
         await saveQuoteToSupabase({
             clientId: quote.client_id,
             text: quote.text,
+            creator: quote.creator,
+            source: quote.source,
             imageFile: imageFile
         });
         cloudSaved = true;
