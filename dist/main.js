@@ -8,7 +8,7 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
     console.log("Session:", session);
     if (session) {
         loadQuotes(session.user.id);
-        syncUnsyncedQuotes();
+        syncLocalChanges();
     }
 });
 async function loadQuotes(userId) {
@@ -23,7 +23,7 @@ async function loadQuotes(userId) {
     }
     console.log("Loaded quotes:", data);
 }
-async function saveQuoteToSupabase({ clientId, text, creator = null, source = null, imageFile = null }) {
+async function saveQuoteToSupabase({ clientId, text, creator = null, source = null, imageFile = null, status = 'active', deletedAt = null }) {
     const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
     if (userErr)
         throw userErr;
@@ -34,16 +34,21 @@ async function saveQuoteToSupabase({ clientId, text, creator = null, source = nu
     if (imageFile) {
         imagePath = await uploadQuoteImage(imageFile);
     }
+    const quotePayload = {
+        client_id: clientId,
+        user_id: user.id,
+        text: text || null,
+        creator: creator || null,
+        source: source || null,
+        status,
+        deletedAt
+    };
+    if (imagePath) {
+        quotePayload.image_path = imagePath;
+    }
     const { data, error } = await supabaseClient
         .from("quotes")
-        .upsert([{
-            client_id: clientId,
-            user_id: user.id,
-            text: text || null,
-            image_path: imagePath,
-            creator: creator || null,
-            source: source || null
-        }], {
+        .upsert([quotePayload], {
         onConflict: 'client_id'
     })
         .select()
@@ -78,6 +83,21 @@ async function softDeleteQuotesInSupabase(clientIds) {
 }
 async function softDeleteQuoteInSupabase(clientId) {
     return softDeleteQuotesInSupabase([clientId]);
+}
+async function updateQuoteStatusInSupabase(clientIds, status, deletedAt = null) {
+    const { data: authData } = await supabaseClient.auth.getUser();
+    const user = authData.user;
+    if (!user || clientIds.length === 0)
+        return;
+    const { error } = await supabaseClient
+        .from('quotes')
+        .update({ status, deletedAt })
+        .eq('user_id', user.id)
+        .in('client_id', clientIds);
+    if (error) {
+        console.error('Supabase status update failed:', error);
+        throw error;
+    }
 }
 async function getCurrentUser() {
     const { data, error } = await supabaseClient.auth.getUser();
@@ -115,10 +135,55 @@ async function uploadQuoteImage(file) {
         throw uploadError;
     return filePath;
 }
+async function getServerQuoteStatusMap() {
+    const user = await getCurrentUser();
+    if (!user)
+        return new Map();
+    const { data, error } = await supabaseClient
+        .from('quotes')
+        .select('client_id,status,deletedAt')
+        .eq('user_id', user.id);
+    if (error) {
+        console.error('Error loading server quote statuses:', error);
+        throw error;
+    }
+    return new Map((data || []).map(quote => [quote.client_id, quote]));
+}
+function quoteNeedsSync(quote, serverQuote) {
+    if (!quote.client_id)
+        return false;
+    if (!quote.synced)
+        return true;
+    if (!serverQuote)
+        return true;
+    const localStatus = quote.status || 'active';
+    const serverStatus = serverQuote.status || 'active';
+    if (localStatus !== serverStatus)
+        return true;
+    const localDeletedAt = quote.deletedAt ? new Date(quote.deletedAt).getTime() : null;
+    const serverDeletedAt = serverQuote.deletedAt ? new Date(serverQuote.deletedAt).getTime() : null;
+    return localDeletedAt !== serverDeletedAt;
+}
+let isSyncingLocalChanges = false;
+async function syncLocalChanges() {
+    if (isSyncingLocalChanges || !db || !navigator.onLine)
+        return;
+    try {
+        isSyncingLocalChanges = true;
+        await syncUnsyncedQuotes();
+        await loadDailyQuote();
+        await loadGallery(currentFilter);
+        await updateSettingsStats();
+    }
+    finally {
+        isSyncingLocalChanges = false;
+    }
+}
 async function syncUnsyncedQuotes() {
     const quotes = await getAllQuotes();
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-    const unsyncedQuotes = quotes.filter(q => !q.synced);
+    const serverQuoteStatusMap = await getServerQuoteStatusMap();
+    const unsyncedQuotes = quotes.filter(q => quoteNeedsSync(q, serverQuoteStatusMap.get(q.client_id)));
     for (const quote of unsyncedQuotes) {
         try {
             if (!navigator.onLine)
@@ -141,13 +206,15 @@ async function syncUnsyncedQuotes() {
                 await updateQuote(quote.id, { synced: true });
                 continue;
             }
-            // 🔥 CASE 2: active quote → normal sync
+            // 🔥 CASE 2: active or archived quote → normal sync
             await saveQuoteToSupabase({
                 clientId: quote.client_id,
                 text: quote.text,
                 creator: quote.creator,
                 source: quote.source,
-                imageFile: null
+                imageFile: null,
+                status: quote.status || 'active',
+                deletedAt: quote.deletedAt || null
             });
             await updateQuote(quote.id, { synced: true });
         }
@@ -156,6 +223,7 @@ async function syncUnsyncedQuotes() {
         }
     }
 }
+window.addEventListener('online', syncLocalChanges);
 // Dark mode detection and setup
 if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.documentElement.classList.add('dark');
@@ -450,7 +518,7 @@ async function loadGallery(filter = 'active') {
                     ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
                     <div class="gallery-item-content">
                         ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
-                        ${quote.creator ? `<div class="gallery-item-creator">— ${quote.creator}</div>` : ''}
+                        ${quote.creator ? `<div class="gallery-item-creator">- ${quote.creator}</div>` : ''}
                         ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
                         <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
                     </div>
@@ -478,7 +546,8 @@ function updateSelectionUI() {
     const hasSelection = selectedQuotes.size > 0;
     document.getElementById('archiveSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter !== 'active');
     document.getElementById('deleteSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter === 'deleted');
-    document.getElementById('recoverSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter !== 'deleted');
+    document.getElementById('recoverSelectedBtn').classList.toggle('hidden', !hasSelection || !['archived', 'deleted'].includes(currentFilter));
+    document.getElementById('recoverSelectedBtn').textContent = currentFilter === 'archived' ? 'Unarchive' : 'Recover';
     document.getElementById('cancelSelectionBtn').classList.toggle('hidden', !hasSelection);
 }
 // Filter tabs
@@ -559,7 +628,9 @@ document.getElementById('addQuoteForm').addEventListener('submit', async (e) => 
             text: quote.text,
             creator: quote.creator,
             source: quote.source,
-            imageFile: imageFile
+            imageFile: imageFile,
+            status: quote.status,
+            deletedAt: quote.deletedAt
         });
         cloudSaved = true;
     }
@@ -586,8 +657,19 @@ document.getElementById('archiveSelectedBtn').addEventListener('click', async ()
     if (selectedQuotes.size === 0)
         return;
     showCustomConfirm(`Archive ${selectedQuotes.size} quote(s)?`, async () => {
+        const quotes = await getAllQuotes();
         for (const id of selectedQuotes) {
-            await updateQuote(id, { status: 'archived' });
+            const quote = quotes.find(q => q.id === id);
+            await updateQuote(id, { status: 'archived', deletedAt: null, synced: false });
+            try {
+                if (navigator.onLine && quote?.client_id) {
+                    await updateQuoteStatusInSupabase([quote.client_id], 'archived');
+                    await updateQuote(id, { synced: true });
+                }
+            }
+            catch (err) {
+                console.warn('Archive sync failed, will retry later:', err);
+            }
         }
         selectedQuotes.clear();
         loadGallery(currentFilter);
@@ -627,13 +709,24 @@ document.getElementById('deleteSelectedBtn').addEventListener('click', async () 
 document.getElementById('recoverSelectedBtn').addEventListener('click', async () => {
     if (selectedQuotes.size === 0)
         return;
+    const quotes = await getAllQuotes();
     for (const id of selectedQuotes) {
-        await updateQuote(id, { status: 'active', deletedAt: null });
+        const quote = quotes.find(q => q.id === id);
+        await updateQuote(id, { status: 'active', deletedAt: null, synced: false });
+        try {
+            if (navigator.onLine && quote?.client_id) {
+                await updateQuoteStatusInSupabase([quote.client_id], 'active');
+                await updateQuote(id, { synced: true });
+            }
+        }
+        catch (err) {
+            console.warn('Recover sync failed, will retry later:', err);
+        }
     }
     selectedQuotes.clear();
     loadGallery(currentFilter);
     loadDailyQuote();
-    showCustomAlert('Quote(s) recovered successfully!');
+    showCustomAlert(currentFilter === 'archived' ? 'Quote(s) unarchived successfully!' : 'Quote(s) recovered successfully!');
 });
 document.getElementById('cancelSelectionBtn').addEventListener('click', () => {
     selectedQuotes.clear();
@@ -784,6 +877,7 @@ function showCustomConfirm(message, onConfirm) {
 async function initApp() {
     await initDB();
     await cleanupExpiredQuotes();
+    await syncLocalChanges();
     await loadDailyQuote();
     await updateSettingsStats();
 }
