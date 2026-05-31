@@ -506,6 +506,71 @@
             margin-top: 4px;
         }
 
+        .settings-account-row {
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .auth-modal {
+            display: none;
+        }
+
+        .auth-modal.active {
+            display: flex;
+        }
+
+        .auth-modal-content {
+            max-width: 420px;
+        }
+
+        .auth-password-group {
+            position: relative;
+        }
+
+        .auth-help {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .auth-help.hidden {
+            display: none;
+        }
+
+        .auth-form .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .auth-links {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 12px;
+        }
+
+        .text-link {
+            background: none;
+            border: none;
+            color: var(--accent);
+            padding: 0;
+            text-align: left;
+            font: inherit;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .text-link:hover {
+            color: var(--accent-hover);
+        }
+
+        .auth-message {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
         .toggle-switch {
             position: relative;
             width: 60px;

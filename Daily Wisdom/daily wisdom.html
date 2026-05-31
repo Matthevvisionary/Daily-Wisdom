@@ -94,6 +94,45 @@
             </div>
 
             <div class="settings-section">
+                <h2 class="settings-section-title">Account</h2>
+                <div class="settings-item settings-account-row">
+                    <div>
+                        <div class="settings-item-label">Cloud Sync</div>
+                        <div class="settings-item-description" id="authStatusDescription">Sign in to sync your quotes across devices.</div>
+                    </div>
+                    <button class="btn btn-primary" id="authToggleBtn">Sign In</button>
+                </div>
+
+                <div class="modal auth-modal" id="authModal">
+                    <div class="modal-content auth-modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title">Sign in</h2>
+                            <button class="modal-close" id="closeAuthModal" type="button" aria-label="Close sign in">×</button>
+                        </div>
+                        <form id="authForm" class="auth-form">
+                            <div class="form-group">
+                                <label class="form-label" for="authEmail">Email</label>
+                                <input class="form-input" id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" required>
+                            </div>
+                            <div class="form-group auth-password-group">
+                                <label class="form-label" for="authPassword">Password</label>
+                                <input class="form-input" id="authPassword" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+                                <p class="auth-help hidden" id="authPasswordHelp">Password must be at least 6 characters, contain at least one letter and one number.</p>
+                            </div>
+                            <button class="btn btn-primary" type="submit" id="authSubmitBtn">Sign In</button>
+                        </form>
+
+                        <div class="auth-links">
+                            <button class="text-link" id="forgotPasswordBtn" type="button">Forgot password?</button>
+                            <button class="text-link" id="createAccountBtn" type="button">Create account</button>
+                        </div>
+
+                        <p class="auth-message" id="authMessage"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
                 <h2 class="settings-section-title">Data Management</h2>
                 <div class="settings-item">
                     <div>

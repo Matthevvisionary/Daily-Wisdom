@@ -6,6 +6,7 @@ console.log("Supabase ready:", supabaseClient);
 supabaseClient.auth.onAuthStateChange((event, session) => {
     console.log("Auth event:", event);
     console.log("Session:", session);
+    updateAuthUI(session);
     if (session) {
         loadQuotes(session.user.id);
         syncLocalChanges();
@@ -104,6 +105,140 @@ async function getCurrentUser() {
     if (error)
         throw error;
     return data.user;
+}
+function updateAuthUI(session) {
+    const isSignedIn = Boolean(session?.user);
+    const authToggleButton = document.getElementById('authToggleBtn');
+    const statusDescription = document.getElementById('authStatusDescription');
+    if (authToggleButton) {
+        authToggleButton.textContent = isSignedIn ? 'Sign Out' : 'Sign In';
+    }
+    if (statusDescription) {
+        statusDescription.textContent = isSignedIn ? 'You are signed in and syncing quotes.' : 'Sign in to sync your quotes across devices.';
+    }
+}
+function validatePassword(password) {
+    if (!password || password.length < 6) {
+        return 'Password must be at least 6 characters.';
+    }
+    if (!/[a-zA-Z]/.test(password)) {
+        return 'Password must contain at least one letter.';
+    }
+    if (!/[0-9]/.test(password)) {
+        return 'Password must contain at least one number.';
+    }
+    return null;
+}
+async function handleEmailPasswordAuth(mode = 'signIn') {
+    const emailInput = document.getElementById('authEmail');
+    const passwordInput = document.getElementById('authPassword');
+    const messageBox = document.getElementById('authMessage');
+    const email = emailInput?.value.trim();
+    const password = passwordInput?.value;
+    if (!email) {
+        if (messageBox)
+            messageBox.textContent = 'Please enter your email.';
+        return;
+    }
+    if (mode !== 'reset') {
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            if (messageBox)
+                messageBox.textContent = passwordError;
+            return;
+        }
+    }
+    try {
+        if (mode === 'signIn') {
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error)
+                throw error;
+            if (messageBox)
+                messageBox.textContent = 'Signed in successfully.';
+            showCustomAlert('Signed in successfully.');
+            closeAuthModal();
+        }
+        else if (mode === 'signUp') {
+            const { error } = await supabaseClient.auth.signUp({ email, password });
+            if (error)
+                throw error;
+            if (messageBox)
+                messageBox.textContent = 'Account created. Check your email for confirmation.';
+            showCustomAlert('Account created. Check your email for confirmation.');
+            closeAuthModal();
+        }
+        else if (mode === 'reset') {
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin
+            });
+            if (error)
+                throw error;
+            if (messageBox)
+                messageBox.textContent = 'Password reset email sent.';
+            showCustomAlert('Password reset email sent.');
+        }
+        await syncLocalChanges();
+        const { data } = await supabaseClient.auth.getSession();
+        updateAuthUI(data.session);
+    }
+    catch (err) {
+        console.error('Auth action failed:', err);
+        if (messageBox)
+            messageBox.textContent = err?.message || 'Authentication failed.';
+        showCustomAlert(err?.message || 'Authentication failed.');
+    }
+}
+let currentAuthMode = 'signIn';
+function updateAuthModalUI() {
+    const title = document.querySelector('#authModal .modal-title');
+    const submitBtn = document.getElementById('authSubmitBtn');
+    const passwordHelp = document.getElementById('authPasswordHelp');
+    const passwordInput = document.getElementById('authPassword');
+    const createAccountBtn = document.getElementById('createAccountBtn');
+    if (title) {
+        title.textContent = currentAuthMode === 'signUp' ? 'Create account' : currentAuthMode === 'reset' ? 'Reset password' : 'Sign in';
+    }
+    if (submitBtn) {
+        submitBtn.textContent = currentAuthMode === 'signUp' ? 'Create account' : currentAuthMode === 'reset' ? 'Send reset link' : 'Sign In';
+    }
+    if (passwordHelp) {
+        passwordHelp.classList.toggle('hidden', currentAuthMode !== 'signUp');
+    }
+    const passwordGroup = document.querySelector('.auth-password-group');
+    if (passwordGroup) {
+        passwordGroup.classList.toggle('hidden', currentAuthMode === 'reset');
+    }
+    if (passwordInput) {
+        passwordInput.required = currentAuthMode !== 'reset';
+        passwordInput.placeholder = currentAuthMode === 'signUp' ? 'Create a password' : 'Enter your password';
+    }
+    if (createAccountBtn) {
+        createAccountBtn.textContent = currentAuthMode === 'signUp' ? 'Already have an account? Sign in' : 'Create account';
+    }
+}
+function openAuthModal(mode = 'signIn') {
+    currentAuthMode = mode;
+    const authModal = document.getElementById('authModal');
+    const authMessage = document.getElementById('authMessage');
+    if (authMessage) {
+        authMessage.textContent = '';
+    }
+    updateAuthModalUI();
+    if (authModal) {
+        authModal.classList.add('active');
+    }
+}
+function closeAuthModal() {
+    const authModal = document.getElementById('authModal');
+    if (authModal) {
+        authModal.classList.remove('active');
+    }
+}
+async function handleSignOut() {
+    await supabaseClient.auth.signOut();
+    closeAuthModal();
+    updateAuthUI(null);
+    showCustomAlert('You have been signed out.');
 }
 async function permanentlyDeleteQuoteFromSupabase(clientId) {
     const user = await getCurrentUser();
@@ -802,6 +937,24 @@ async function updateSettingsStats() {
     document.getElementById('totalQuotesCount').textContent =
         `${activeQuotes.length} quote${activeQuotes.length !== 1 ? 's' : ''} in collection`;
 }
+document.getElementById('authToggleBtn').addEventListener('click', async () => {
+    const session = await supabaseClient.auth.getSession();
+    if (session.data.session) {
+        await handleSignOut();
+        return;
+    }
+    openAuthModal();
+});
+document.getElementById('closeAuthModal').addEventListener('click', closeAuthModal);
+document.getElementById('authForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await handleEmailPasswordAuth(currentAuthMode);
+});
+document.getElementById('forgotPasswordBtn').addEventListener('click', () => openAuthModal('reset'));
+document.getElementById('createAccountBtn').addEventListener('click', () => {
+    const nextMode = currentAuthMode === 'signUp' ? 'signIn' : 'signUp';
+    openAuthModal(nextMode);
+});
 document.getElementById('clearDataBtn').addEventListener('click', () => {
     showCustomConfirm('Are you sure you want to permanently delete all quotes? This action cannot be undone.', async () => {
         await clearAllData();
@@ -875,6 +1028,9 @@ function showCustomConfirm(message, onConfirm) {
 }
 // Initialize app
 async function initApp() {
+    // Check initial auth state and update UI
+    const { data } = await supabaseClient.auth.getSession();
+    updateAuthUI(data.session);
     await initDB();
     await cleanupExpiredQuotes();
     await syncLocalChanges();

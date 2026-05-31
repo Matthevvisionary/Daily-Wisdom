@@ -1,2 +1,4 @@
 PROJECT.md
 node_modules/
+.env
+.env.local
