@@ -189,6 +189,98 @@ async function handleEmailPasswordAuth(mode = 'signIn') {
     }
 }
 let currentAuthMode = 'signIn';
+const modalFocusableSelector = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+].join(',');
+const managedModalStack = [];
+function getVisibleModalFocusableElements(modal) {
+    if (!modal)
+        return [];
+    return Array.from(modal.querySelectorAll(modalFocusableSelector))
+        .filter(element => element.offsetParent !== null);
+}
+function focusModalElement(modal, initialFocus) {
+    const target = initialFocus || getVisibleModalFocusableElements(modal)[0];
+    target?.focus();
+}
+function trapModalTab(event, modal) {
+    const focusableElements = getVisibleModalFocusableElements(modal);
+    if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+    }
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+    }
+    else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+    }
+}
+function openManagedModal(modal, { initialFocus = null, onClose = null } = {}) {
+    if (!modal)
+        return;
+    const existingEntry = managedModalStack.find(entry => entry.modal === modal);
+    modal.classList.add('active');
+    if (existingEntry) {
+        existingEntry.initialFocus = initialFocus;
+        existingEntry.onClose = onClose || existingEntry.onClose;
+        focusModalElement(modal, initialFocus);
+        return;
+    }
+    managedModalStack.push({
+        modal,
+        initialFocus,
+        onClose,
+        returnFocusTo: document.activeElement
+    });
+    focusModalElement(modal, initialFocus);
+}
+function closeManagedModal(modal) {
+    const entryIndex = managedModalStack.findIndex(entry => entry.modal === modal);
+    if (entryIndex === -1) {
+        modal?.classList.remove('active');
+        return;
+    }
+    const entry = managedModalStack[entryIndex];
+    const wasTopModal = entryIndex === managedModalStack.length - 1;
+    managedModalStack.splice(entryIndex, 1);
+    if (entry.onClose) {
+        entry.onClose();
+    }
+    else {
+        modal.classList.remove('active');
+    }
+    if (!wasTopModal)
+        return;
+    const nextTopModal = managedModalStack[managedModalStack.length - 1];
+    if (nextTopModal) {
+        focusModalElement(nextTopModal.modal, nextTopModal.initialFocus);
+    }
+    else if (entry.returnFocusTo && document.contains(entry.returnFocusTo)) {
+        entry.returnFocusTo.focus();
+    }
+}
+document.addEventListener('keydown', (event) => {
+    const topModal = managedModalStack[managedModalStack.length - 1];
+    if (!topModal)
+        return;
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        closeManagedModal(topModal.modal);
+    }
+    else if (event.key === 'Tab') {
+        trapModalTab(event, topModal.modal);
+    }
+});
 function updateAuthModalUI() {
     const title = document.querySelector('#authModal .modal-title');
     const submitBtn = document.getElementById('authSubmitBtn');
@@ -225,13 +317,15 @@ function openAuthModal(mode = 'signIn') {
     }
     updateAuthModalUI();
     if (authModal) {
-        authModal.classList.add('active');
+        openManagedModal(authModal, {
+            initialFocus: document.getElementById('authEmail')
+        });
     }
 }
 function closeAuthModal() {
     const authModal = document.getElementById('authModal');
     if (authModal) {
-        authModal.classList.remove('active');
+        closeManagedModal(authModal);
     }
 }
 async function handleSignOut() {
@@ -695,16 +789,19 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
 });
 // Add quote modal
 function openAddModal() {
-    document.getElementById('addQuoteModal').classList.add('active');
+    const addQuoteModal = document.getElementById('addQuoteModal');
     document.getElementById('quoteText').value = '';
     document.getElementById('quoteCreator').value = '';
     document.getElementById('quoteSource').value = '';
     document.getElementById('quoteImage').value = '';
     document.getElementById('imagePreview').innerHTML = '';
     document.getElementById('imagePreview').classList.add('hidden');
+    openManagedModal(addQuoteModal, {
+        initialFocus: document.getElementById('quoteText')
+    });
 }
 function closeAddModal() {
-    document.getElementById('addQuoteModal').classList.remove('active');
+    closeManagedModal(document.getElementById('addQuoteModal'));
 }
 document.getElementById('addQuoteBtn').addEventListener('click', openAddModal);
 document.getElementById('closeAddModal').addEventListener('click', closeAddModal);
@@ -993,21 +1090,27 @@ async function cleanupExpiredQuotes() {
 // Custom alert/confirm dialogs
 function showCustomAlert(message) {
     const modal = document.createElement('div');
-    modal.className = 'modal active';
+    modal.className = 'modal';
     modal.innerHTML = `
                 <div class="modal-content" style="max-width: 400px;">
                     <div class="modal-header">
                         <h2 class="modal-title">Notice</h2>
                     </div>
                     <p style="color: var(--text-secondary); margin-bottom: 20px;">${message}</p>
-                    <button class="btn btn-primary" style="width: 100%;" onclick="this.closest('.modal').remove()">OK</button>
+                    <button class="btn btn-primary alert-ok-btn" style="width: 100%;">OK</button>
                 </div>
             `;
     document.body.appendChild(modal);
+    const okButton = modal.querySelector('.alert-ok-btn');
+    okButton.addEventListener('click', () => closeManagedModal(modal));
+    openManagedModal(modal, {
+        initialFocus: okButton,
+        onClose: () => modal.remove()
+    });
 }
 function showCustomConfirm(message, onConfirm) {
     const modal = document.createElement('div');
-    modal.className = 'modal active';
+    modal.className = 'modal';
     modal.innerHTML = `
                 <div class="modal-content" style="max-width: 400px;">
                     <div class="modal-header">
@@ -1015,15 +1118,22 @@ function showCustomConfirm(message, onConfirm) {
                     </div>
                     <p style="color: var(--text-secondary); margin-bottom: 20px;">${message}</p>
                     <div style="display: flex; gap: 12px;">
-                        <button class="btn btn-secondary" style="flex: 1;" onclick="this.closest('.modal').remove()">Cancel</button>
+                        <button class="btn btn-secondary cancel-btn" style="flex: 1;">Cancel</button>
                         <button class="btn btn-primary confirm-btn" style="flex: 1;">Confirm</button>
                     </div>
                 </div>
             `;
     document.body.appendChild(modal);
+    modal.querySelector('.cancel-btn').addEventListener('click', () => {
+        closeManagedModal(modal);
+    });
     modal.querySelector('.confirm-btn').addEventListener('click', () => {
-        modal.remove();
+        closeManagedModal(modal);
         onConfirm();
+    });
+    openManagedModal(modal, {
+        initialFocus: modal.querySelector('.cancel-btn'),
+        onClose: () => modal.remove()
     });
 }
 // Initialize app
