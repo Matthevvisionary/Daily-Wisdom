@@ -100,11 +100,31 @@ async function updateQuoteStatusInSupabase(clientIds, status, deletedAt = null) 
         throw error;
     }
 }
+let authVerificationPromise = null;
+async function getVerifiedSession() {
+    if (authVerificationPromise)
+        return authVerificationPromise;
+    authVerificationPromise = (async () => {
+        const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+        if (userError || !userData.user) {
+            updateAuthUI(null);
+            return null;
+        }
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const session = sessionData.session || { user: userData.user };
+        updateAuthUI(session);
+        return session;
+    })();
+    try {
+        return await authVerificationPromise;
+    }
+    finally {
+        authVerificationPromise = null;
+    }
+}
 async function getCurrentUser() {
-    const { data, error } = await supabaseClient.auth.getUser();
-    if (error)
-        throw error;
-    return data.user;
+    const session = await getVerifiedSession();
+    return session?.user || null;
 }
 function updateAuthUI(session) {
     const isSignedIn = Boolean(session?.user);
@@ -128,6 +148,20 @@ function validatePassword(password) {
         return 'Password must contain at least one number.';
     }
     return null;
+}
+function getAuthErrorMessage(err) {
+    const message = err?.message || 'Authentication failed.';
+    if (message.toLowerCase().includes('failed to fetch')) {
+        return 'Could not reach Supabase. Check your internet connection, browser privacy/ad-block settings, or whether the Supabase project is available.';
+    }
+    return message;
+}
+function getAuthRedirectOptions() {
+    if (!window.location.protocol.startsWith('http'))
+        return {};
+    return {
+        redirectTo: window.location.origin
+    };
 }
 async function handleEmailPasswordAuth(mode = 'signIn') {
     const emailInput = document.getElementById('authEmail');
@@ -168,24 +202,24 @@ async function handleEmailPasswordAuth(mode = 'signIn') {
             closeAuthModal();
         }
         else if (mode === 'reset') {
-            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin
-            });
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, getAuthRedirectOptions());
             if (error)
                 throw error;
             if (messageBox)
                 messageBox.textContent = 'Password reset email sent.';
             showCustomAlert('Password reset email sent.');
+            return;
         }
-        await syncLocalChanges();
-        const { data } = await supabaseClient.auth.getSession();
-        updateAuthUI(data.session);
+        const session = await getVerifiedSession();
+        if (session)
+            await syncLocalChanges();
     }
     catch (err) {
         console.error('Auth action failed:', err);
+        const authErrorMessage = getAuthErrorMessage(err);
         if (messageBox)
-            messageBox.textContent = err?.message || 'Authentication failed.';
-        showCustomAlert(err?.message || 'Authentication failed.');
+            messageBox.textContent = authErrorMessage;
+        showCustomAlert(authErrorMessage);
     }
 }
 let currentAuthMode = 'signIn';
@@ -1035,12 +1069,22 @@ async function updateSettingsStats() {
         `${activeQuotes.length} quote${activeQuotes.length !== 1 ? 's' : ''} in collection`;
 }
 document.getElementById('authToggleBtn').addEventListener('click', async () => {
-    const session = await supabaseClient.auth.getSession();
-    if (session.data.session) {
+    const session = await getVerifiedSession();
+    if (session) {
         await handleSignOut();
         return;
     }
     openAuthModal();
+});
+window.addEventListener('focus', () => {
+    getVerifiedSession();
+});
+window.addEventListener('online', () => {
+    getVerifiedSession();
+});
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden)
+        getVerifiedSession();
 });
 document.getElementById('closeAuthModal').addEventListener('click', closeAuthModal);
 document.getElementById('authForm').addEventListener('submit', async (event) => {
@@ -1138,9 +1182,8 @@ function showCustomConfirm(message, onConfirm) {
 }
 // Initialize app
 async function initApp() {
-    // Check initial auth state and update UI
-    const { data } = await supabaseClient.auth.getSession();
-    updateAuthUI(data.session);
+    // Check initial auth state against Supabase, not only local cached storage.
+    await getVerifiedSession();
     await initDB();
     await cleanupExpiredQuotes();
     await syncLocalChanges();
