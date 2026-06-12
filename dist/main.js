@@ -1098,10 +1098,20 @@ document.getElementById('searchInput').addEventListener('input', () => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(performSearch, 300);
 });
+document.getElementById('creatorSearchInput').addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(performSearch, 300);
+});
+document.getElementById('sourceSearchInput').addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(performSearch, 300);
+});
 document.getElementById('searchFromDate').addEventListener('change', performSearch);
 document.getElementById('searchToDate').addEventListener('change', performSearch);
 async function performSearch() {
     const keyword = document.getElementById('searchInput').value.toLowerCase().trim();
+    const creator = document.getElementById('creatorSearchInput').value.toLowerCase().trim();
+    const source = document.getElementById('sourceSearchInput').value.toLowerCase().trim();
     const fromDate = document.getElementById('searchFromDate').value;
     const toDate = document.getElementById('searchToDate').value;
     let quotes = await getAllQuotes();
@@ -1109,6 +1119,14 @@ async function performSearch() {
     // Filter by keyword
     if (keyword) {
         quotes = quotes.filter(q => q.text && q.text.toLowerCase().includes(keyword));
+    }
+    // Filter by creator
+    if (creator) {
+        quotes = quotes.filter(q => q.creator && q.creator.toLowerCase().includes(creator));
+    }
+    // Filter by source
+    if (source) {
+        quotes = quotes.filter(q => q.source && q.source.toLowerCase().includes(source));
     }
     // Filter by date range
     if (fromDate) {
@@ -1139,6 +1157,8 @@ async function performSearch() {
                     ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
                     <div class="gallery-item-content">
                         ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
+                        ${quote.creator ? `<div class="gallery-item-creator">- ${quote.creator}</div>` : ''}
+                        ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
                         <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
                     </div>
                 </div>
