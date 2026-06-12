@@ -667,6 +667,7 @@
         // State management
         let selectedQuotes = new Set();
         let currentFilter = 'active';
+        let editingQuoteId = null;
 
         // Navigation
         function switchScreen(screenId) {
@@ -938,6 +939,7 @@
         function updateSelectionUI() {
             const hasSelection = selectedQuotes.size > 0;
 
+            document.getElementById('editSelectedBtn').classList.toggle('hidden', selectedQuotes.size !== 1 || currentFilter === 'deleted');
             document.getElementById('archiveSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter !== 'active');
             document.getElementById('deleteSelectedBtn').classList.toggle('hidden', !hasSelection || currentFilter === 'deleted');
             document.getElementById('recoverSelectedBtn').classList.toggle('hidden', !hasSelection || !['archived', 'deleted'].includes(currentFilter));
@@ -955,21 +957,57 @@
         });
 
         // Add quote modal
-        function openAddModal() {
-            const addQuoteModal = document.getElementById('addQuoteModal');
+        function resetQuoteForm() {
+            document.querySelector('#addQuoteModal .modal-title').textContent = 'Add New Quote';
+            document.getElementById('saveQuoteBtn').textContent = 'Add Quote';
             document.getElementById('quoteText').value = '';
             document.getElementById('quoteCreator').value = '';
             document.getElementById('quoteSource').value = '';
             document.getElementById('quoteImage').value = '';
             document.getElementById('imagePreview').innerHTML = '';
             document.getElementById('imagePreview').classList.add('hidden');
+        }
+
+        function openAddModal() {
+            const addQuoteModal = document.getElementById('addQuoteModal');
+            editingQuoteId = null;
+            resetQuoteForm();
             openManagedModal(addQuoteModal, {
+                initialFocus: document.getElementById('quoteText')
+            });
+        }
+
+        async function openEditModal(id) {
+            const quotes = await getAllQuotes();
+            const quote = quotes.find(q => q.id === id);
+
+            if (!quote || quote.status === 'deleted') return;
+
+            editingQuoteId = id;
+            document.querySelector('#addQuoteModal .modal-title').textContent = 'Edit Quote';
+            document.getElementById('saveQuoteBtn').textContent = 'Save Changes';
+            document.getElementById('quoteText').value = quote.text || '';
+            document.getElementById('quoteCreator').value = quote.creator || '';
+            document.getElementById('quoteSource').value = quote.source || '';
+            document.getElementById('quoteImage').value = '';
+
+            const preview = document.getElementById('imagePreview');
+            if (quote.image) {
+                preview.innerHTML = `<img src="${quote.image}" alt="Current quote image">`;
+                preview.classList.remove('hidden');
+            } else {
+                preview.innerHTML = '';
+                preview.classList.add('hidden');
+            }
+
+            openManagedModal(document.getElementById('addQuoteModal'), {
                 initialFocus: document.getElementById('quoteText')
             });
         }
 
         function closeAddModal() {
             closeManagedModal(document.getElementById('addQuoteModal'));
+            editingQuoteId = null;
         }
 
         document.getElementById('addQuoteBtn').addEventListener('click', openAddModal);
@@ -1006,6 +1044,66 @@
             const creator = document.getElementById('quoteCreator').value.trim();
             const source = document.getElementById('quoteSource').value.trim();
             const imageFile = document.getElementById('quoteImage').files[0];
+
+            if (editingQuoteId !== null) {
+                const quotes = await getAllQuotes();
+                const existingQuote = quotes.find(q => q.id === editingQuoteId);
+
+                if (!existingQuote) {
+                    closeAddModal();
+                    showCustomAlert('Quote could not be found.');
+                    return;
+                }
+
+                let imageData = existingQuote.image || null;
+                if (imageFile) {
+                    imageData = await fileToBase64(imageFile);
+                }
+
+                if (!text && !imageData) {
+                    showCustomAlert('Please keep either text or an image');
+                    return;
+                }
+
+                const updates = {
+                    text,
+                    creator: creator || null,
+                    source: source || null,
+                    image: imageData,
+                    synced: false
+                };
+
+                await updateQuote(editingQuoteId, updates);
+
+                let cloudSaved = false;
+                try {
+                    if (navigator.onLine && existingQuote.client_id) {
+                        await saveQuoteToSupabase({
+                            clientId: existingQuote.client_id,
+                            text: updates.text,
+                            creator: updates.creator,
+                            source: updates.source,
+                            imageFile: imageFile || null,
+                            status: existingQuote.status || 'active',
+                            deletedAt: existingQuote.deletedAt || null
+                        });
+                        cloudSaved = true;
+                    }
+                } catch (err) {
+                    console.warn("Supabase edit failed, will retry later:", err);
+                }
+
+                if (cloudSaved) {
+                    await updateQuote(editingQuoteId, { synced: true });
+                }
+
+                closeAddModal();
+                selectedQuotes.clear();
+                loadGallery(currentFilter);
+                loadDailyQuote();
+                showCustomAlert('Quote updated successfully!');
+                return;
+            }
 
             if (!text && !imageFile) {
                 showCustomAlert('Please add either text or an image');
@@ -1069,6 +1167,11 @@
         }
 
         // Gallery actions
+        document.getElementById('editSelectedBtn').addEventListener('click', async () => {
+            if (selectedQuotes.size !== 1) return;
+            await openEditModal([...selectedQuotes][0]);
+        });
+
         document.getElementById('archiveSelectedBtn').addEventListener('click', async () => {
             if (selectedQuotes.size === 0) return;
 
