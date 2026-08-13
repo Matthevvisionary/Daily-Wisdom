@@ -15,6 +15,7 @@
             updateAuthUI(session);
 
             if (session) {
+                localStorage.setItem('dailyInspoStarted', 'true');
                 loadQuotes(session.user.id);
                 syncLocalChanges();
             }
@@ -36,6 +37,40 @@
 
         }
 
+        function normalizeQuoteText(value) {
+            let text = String(value ?? '').trim();
+            const openingMarks = new Set(['"', '“', '”', '„', '‟', '«']);
+            const closingMarks = new Set(['"', '“', '”', '„', '‟', '»']);
+
+            while (
+                text.length >= 2 &&
+                openingMarks.has(text[0]) &&
+                closingMarks.has(text[text.length - 1])
+            ) {
+                text = text.slice(1, -1).trim();
+            }
+
+            return text;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function getQuoteLengthClass(value) {
+            const length = normalizeQuoteText(value).length;
+
+            if (length <= 55) return 'quote-length-short';
+            if (length <= 140) return 'quote-length-medium';
+            if (length <= 280) return 'quote-length-long';
+            return 'quote-length-extra-long';
+        }
+
         async function saveQuoteToSupabase({ clientId, text, creator = null, source = null, imageFile = null, status = 'active', deletedAt = null }) {
             const { data: { user }, error: userErr } = await supabaseClient.auth.getUser();
             if (userErr) throw userErr;
@@ -51,7 +86,7 @@
             const quotePayload = {
                 client_id: clientId,
                 user_id: user.id,
-                text: text || null,
+                text: normalizeQuoteText(text) || null,
                 creator: creator || null,
                 source: source || null,
                 status,
@@ -562,18 +597,24 @@
 
 
 
-        // Dark mode detection and setup
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.documentElement.classList.add('dark');
-            document.getElementById('darkModeToggle').checked = true;
+        // Theme setup: persist an explicit choice, otherwise follow the OS.
+        const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const darkModeToggle = document.getElementById('darkModeToggle');
+
+        function applyTheme(theme, persist = false) {
+            const isDark = theme === 'dark';
+            document.documentElement.classList.toggle('dark', isDark);
+            document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+            if (darkModeToggle) darkModeToggle.checked = isDark;
+            if (persist) localStorage.setItem('dailyInspoTheme', theme);
         }
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-            if (event.matches) {
-                document.documentElement.classList.add('dark');
-                document.getElementById('darkModeToggle').checked = true;
-            } else {
-                document.documentElement.classList.remove('dark');
-                document.getElementById('darkModeToggle').checked = false;
+
+        const savedTheme = localStorage.getItem('dailyInspoTheme');
+        applyTheme(savedTheme || (colorSchemeQuery.matches ? 'dark' : 'light'));
+
+        colorSchemeQuery.addEventListener('change', event => {
+            if (!localStorage.getItem('dailyInspoTheme')) {
+                applyTheme(event.matches ? 'dark' : 'light');
             }
         });
 
@@ -611,7 +652,10 @@
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
                 const store = transaction.objectStore(STORE_NAME);
                 const request = store.add(quote);
-                request.onsuccess = () => resolve(request.result);
+                request.onsuccess = () => {
+                    localStorage.setItem('dailyInspoStarted', 'true');
+                    resolve(request.result);
+                };
                 request.onerror = () => reject(request.error);
             });
         }
@@ -670,16 +714,29 @@
         let editingQuoteId = null;
 
         // Navigation
-        function switchScreen(screenId) {
+        function switchScreen(screenId, navItem = null) {
+            const nextScreen = screenId ? document.getElementById(screenId) : null;
+            if (!nextScreen?.classList.contains('screen')) return;
+
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.classList.remove('active');
             });
-            document.getElementById(screenId).classList.add('active');
+            nextScreen.classList.add('active');
 
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
             });
-            event.target.closest('.nav-item').classList.add('active');
+            const matchingNavItem = navItem || document.querySelector(`.nav-item[data-screen="${screenId}"]`);
+            matchingNavItem?.classList.add('active');
+
+            const screenLabels = {
+                homeScreen: 'Your daily quote',
+                exploreScreen: 'Discover something new',
+                galleryScreen: 'Your saved words',
+                settingsScreen: 'Your profile'
+            };
+            const headerContext = document.getElementById('appHeaderContext');
+            if (headerContext) headerContext.textContent = screenLabels[screenId] || '';
 
             // Load screen data
             if (screenId === 'homeScreen') {
@@ -691,10 +748,10 @@
             }
         }
 
-        document.querySelectorAll('.nav-item').forEach(item => {
+        document.querySelectorAll('.nav-item[data-screen]').forEach(item => {
             item.addEventListener('click', (e) => {
                 const screenId = item.dataset.screen;
-                switchScreen(screenId);
+                switchScreen(screenId, item);
             });
         });
 
@@ -725,14 +782,16 @@
         // safety guard (shouldn't happen, but prevents crashes)
         if (!dailyQuote) return;
 
-        let quoteHTML = '<div class="quote-card">';
+        const quoteLengthClass = getQuoteLengthClass(dailyQuote.text);
+        let quoteHTML = `<div class="quote-card ${quoteLengthClass}">`;
 
         if (dailyQuote.image) {
             quoteHTML += `<img src="${dailyQuote.image}" alt="Quote image" class="quote-image">`;
         }
 
         if (dailyQuote.text) {
-            quoteHTML += `<div class="quote-text">${dailyQuote.text}</div>`;
+            const cleanQuoteText = escapeHtml(normalizeQuoteText(dailyQuote.text));
+            quoteHTML += `<div class="quote-text"><span class="quote-mark" aria-hidden="true">“</span>${cleanQuoteText}<span class="quote-mark" aria-hidden="true">”</span></div>`;
         }
 
         if (dailyQuote.creator) {
@@ -768,6 +827,8 @@
         const buttonContainer = document.getElementById('button-container');
 
         if (activeQuotes.length === 0) {
+            prevBtn?.classList.add('hidden');
+            nextBtn?.classList.add('hidden');
             quoteContainer.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">✨</div>
@@ -784,13 +845,9 @@
             return;
         }
 
-        buttonContainer.innerHTML = `
-            <div class="unempty-state">
-                <button class="btn btn-primary" id="addQuoteBtn" onclick="openAddModal()">
-                    + Add New Quote
-                </button>
-            </div>
-        `;
+        buttonContainer.innerHTML = '';
+        prevBtn?.classList.remove('hidden');
+        nextBtn?.classList.remove('hidden');
 
         activeQuotesCache = activeQuotes;
 
@@ -1011,6 +1068,7 @@
         }
 
         document.getElementById('addQuoteBtn').addEventListener('click', openAddModal);
+        document.getElementById('mobileAddQuoteBtn').addEventListener('click', openAddModal);
         document.getElementById('closeAddModal').addEventListener('click', closeAddModal);
         document.getElementById('cancelAddBtn').addEventListener('click', closeAddModal);
 
@@ -1040,7 +1098,7 @@
         document.getElementById('addQuoteForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const text = document.getElementById('quoteText').value.trim();
+            const text = normalizeQuoteText(document.getElementById('quoteText').value);
             const creator = document.getElementById('quoteCreator').value.trim();
             const source = document.getElementById('quoteSource').value.trim();
             const imageFile = document.getElementById('quoteImage').files[0];
@@ -1334,6 +1392,17 @@
             // Display results
             const resultsCount = document.getElementById('searchResultsCount');
             const resultsGrid = document.getElementById('searchResultsGrid');
+            const collectionSearchResults = document.getElementById('collectionSearchResults');
+            const galleryGrid = document.getElementById('galleryGrid');
+            const hasSearch = Boolean(keyword || creator || source || fromDate || toDate);
+
+            collectionSearchResults.classList.toggle('hidden', !hasSearch);
+            galleryGrid.classList.toggle('hidden', hasSearch);
+
+            if (!hasSearch) {
+                await loadGallery(currentFilter);
+                return;
+            }
 
             resultsCount.textContent = `${quotes.length} result${quotes.length !== 1 ? 's' : ''} found`;
 
@@ -1361,12 +1430,8 @@
         }
 
         // Settings
-        document.getElementById('darkModeToggle').addEventListener('change', (e) => {
-            if (e.target.checked) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+        darkModeToggle.addEventListener('change', (e) => {
+            applyTheme(e.target.checked ? 'dark' : 'light', true);
         });
 
         async function updateSettingsStats() {
@@ -1374,7 +1439,69 @@
             const activeQuotes = quotes.filter(q => q.status === 'active');
             document.getElementById('totalQuotesCount').textContent =
                 `${activeQuotes.length} quote${activeQuotes.length !== 1 ? 's' : ''} in collection`;
+            const profileQuoteCount = document.getElementById('profileQuoteCount');
+            if (profileQuoteCount) profileQuoteCount.textContent = String(activeQuotes.length);
         }
+
+        // Explore is a public-content prototype until the public feed has a backend.
+        const exploreSearchInput = document.getElementById('exploreSearchInput');
+        const exploreTopicButtons = document.querySelectorAll('[data-explore-topic]');
+        let activeExploreTopic = 'all';
+
+        function filterExploreContent() {
+            const query = exploreSearchInput.value.toLowerCase().trim();
+            let visibleCount = 0;
+
+            document.querySelectorAll('[data-explore]').forEach(item => {
+                const searchableText = item.dataset.explore;
+                const matchesQuery = !query || searchableText.includes(query);
+                const matchesTopic = activeExploreTopic === 'all' || searchableText.includes(activeExploreTopic);
+                const isVisible = matchesQuery && matchesTopic;
+                item.classList.toggle('hidden', !isVisible);
+                if (isVisible) visibleCount += 1;
+            });
+
+            document.getElementById('exploreNoResults').classList.toggle('hidden', visibleCount > 0);
+        }
+
+        exploreSearchInput?.addEventListener('input', filterExploreContent);
+        exploreTopicButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                activeExploreTopic = button.dataset.exploreTopic;
+                exploreTopicButtons.forEach(item => item.classList.toggle('active', item === button));
+                filterExploreContent();
+            });
+        });
+
+        document.querySelectorAll('.save-public-quote').forEach(button => {
+            button.addEventListener('click', async () => {
+                if (button.classList.contains('saved')) return;
+
+                const card = button.closest('.public-quote-card');
+                const quoteText = normalizeQuoteText(card.querySelector('blockquote')?.textContent);
+                const creator = card.querySelector('p')?.childNodes[0]?.textContent.trim();
+
+                if (quoteText) {
+                    await addQuote({
+                        client_id: crypto.randomUUID(),
+                        text: quoteText,
+                        creator: creator || null,
+                        source: 'Daily Inspo Explore',
+                        image: null,
+                        status: 'active',
+                        createdAt: Date.now(),
+                        deletedAt: null,
+                        synced: false
+                    });
+                    await updateSettingsStats();
+                    await loadDailyQuote();
+                }
+
+                button.classList.add('saved');
+                button.textContent = '✓';
+                button.setAttribute('aria-label', 'Quote saved');
+            });
+        });
 
         document.getElementById('authToggleBtn').addEventListener('click', async () => {
             const session = await getVerifiedSession();
@@ -1508,16 +1635,81 @@
             });
         }
 
+        async function applyPendingOnboarding() {
+            const pendingOnboarding = sessionStorage.getItem('dailyInspoPendingOnboarding');
+            if (!pendingOnboarding) return;
+
+            sessionStorage.removeItem('dailyInspoPendingOnboarding');
+
+            try {
+                const preferences = JSON.parse(pendingOnboarding);
+                localStorage.setItem('dailyInspoPreferences', JSON.stringify(preferences));
+
+                if (preferences.starterQuotes && !localStorage.getItem('dailyInspoStarterQuotesAdded')) {
+                    const starterQuotes = [
+                        { text: 'Your pace is still a pace.', creator: 'Daily Inspo' },
+                        { text: 'Pay attention to what makes you feel more like yourself.', creator: 'Daily Inspo' },
+                        { text: 'Begin with the next honest, possible thing.', creator: 'Daily Inspo' }
+                    ];
+
+                    for (const starter of starterQuotes) {
+                        await addQuote({
+                            client_id: crypto.randomUUID(),
+                            text: starter.text,
+                            creator: starter.creator,
+                            source: 'Starter collection',
+                            image: null,
+                            status: 'active',
+                            createdAt: Date.now(),
+                            deletedAt: null,
+                            synced: false
+                        });
+                    }
+
+                    localStorage.setItem('dailyInspoStarterQuotesAdded', 'true');
+                }
+            } catch (error) {
+                console.warn('Could not apply onboarding preferences:', error);
+            }
+        }
+
+        async function handleEntryAction() {
+            const url = new URL(window.location.href);
+            const action = url.searchParams.get('action');
+            if (!action) return;
+
+            url.searchParams.delete('action');
+            window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+
+            if (action === 'create-account') {
+                switchScreen('settingsScreen');
+                openAuthModal('signUp');
+            } else if (action === 'add-quote') {
+                switchScreen('galleryScreen');
+                openAddModal();
+            } else if (action === 'finish-onboarding') {
+                await applyPendingOnboarding();
+                switchScreen('homeScreen');
+                await loadDailyQuote();
+                await updateSettingsStats();
+            }
+        }
+
         // Initialize app
         async function initApp() {
-            // Check initial auth state against Supabase, not only local cached storage.
-            await getVerifiedSession();
-
+            // Render local content first so Feed remains instant, even when offline.
             await initDB();
             await cleanupExpiredQuotes();
-            await syncLocalChanges();
             await loadDailyQuote();
             await updateSettingsStats();
+            await handleEntryAction();
+
+            try {
+                await getVerifiedSession();
+                await syncLocalChanges();
+            } catch (error) {
+                console.warn('Cloud sync unavailable; continuing with local quotes:', error);
+            }
         }
 
         initApp();
