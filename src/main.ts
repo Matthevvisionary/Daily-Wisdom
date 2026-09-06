@@ -606,6 +606,29 @@ import { starterQuotes } from './data/starterQuotes.js';
         // Theme setup: persist an explicit choice, otherwise follow the OS.
         const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const darkModeToggle = document.getElementById('darkModeToggle');
+        const showStarterQuotesInCollectionToggle = document.getElementById('showStarterQuotesInCollection');
+        const showStarterQuotesInFeedToggle = document.getElementById('showStarterQuotesInFeed');
+        const STARTER_QUOTE_VISIBILITY_KEY = 'dailyInspoStarterQuoteVisibility';
+
+        function getStarterQuoteVisibility() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(STARTER_QUOTE_VISIBILITY_KEY) || '{}');
+                return {
+                    collection: saved.collection !== false,
+                    feed: saved.feed !== false
+                };
+            } catch {
+                return { collection: true, feed: true };
+            }
+        }
+
+        function setStarterQuoteVisibility(visibility) {
+            localStorage.setItem(STARTER_QUOTE_VISIBILITY_KEY, JSON.stringify(visibility));
+            if (showStarterQuotesInCollectionToggle) showStarterQuotesInCollectionToggle.checked = visibility.collection;
+            if (showStarterQuotesInFeedToggle) showStarterQuotesInFeedToggle.checked = visibility.feed;
+        }
+
+        setStarterQuoteVisibility(getStarterQuoteVisibility());
 
         function applyTheme(theme, persist = false) {
             const isDark = theme === 'dark';
@@ -689,9 +712,11 @@ import { starterQuotes } from './data/starterQuotes.js';
             isStarterQuote: true
         }));
 
-        async function getAvailableQuotes() {
+        async function getAvailableQuotes(surface = 'collection') {
             const personalQuotes = await getAllQuotes();
-            return [...personalQuotes, ...starterQuoteRecords];
+            const visibility = getStarterQuoteVisibility();
+            const showStarterQuotes = surface === 'feed' ? visibility.feed : visibility.collection;
+            return showStarterQuotes ? [...personalQuotes, ...starterQuoteRecords] : personalQuotes;
         }
 
         function updateQuote(id, updates) {
@@ -844,7 +869,7 @@ import { starterQuotes } from './data/starterQuotes.js';
         }
 
         async function loadDailyQuote() {
-        const quotes = await getAvailableQuotes();
+        const quotes = await getAvailableQuotes('feed');
         const activeQuotes = quotes.filter(q => q.status === 'active');
 
         const quoteContainer = document.getElementById('dailyQuoteContainer');
@@ -1459,11 +1484,28 @@ import { starterQuotes } from './data/starterQuotes.js';
             applyTheme(e.target.checked ? 'dark' : 'light', true);
         });
 
+        showStarterQuotesInCollectionToggle?.addEventListener('change', async (event) => {
+            const visibility = getStarterQuoteVisibility();
+            visibility.collection = event.target.checked;
+            setStarterQuoteVisibility(visibility);
+            await performSearch();
+            await updateSettingsStats();
+        });
+
+        showStarterQuotesInFeedToggle?.addEventListener('change', async (event) => {
+            const visibility = getStarterQuoteVisibility();
+            visibility.feed = event.target.checked;
+            setStarterQuoteVisibility(visibility);
+            await loadDailyQuote();
+        });
+
         async function updateSettingsStats() {
             const quotes = await getAllQuotes();
             const activeQuotes = quotes.filter(q => q.status === 'active');
+            const starterQuotesInCollection = getStarterQuoteVisibility().collection ? starterQuotes.length : 0;
+            const totalQuotesInCollection = starterQuotesInCollection + activeQuotes.length;
             document.getElementById('totalQuotesCount').textContent =
-                `${starterQuotes.length} built-in + ${activeQuotes.length} personal quote${activeQuotes.length !== 1 ? 's' : ''}`;
+                `${totalQuotesInCollection} quote${totalQuotesInCollection !== 1 ? 's' : ''} in collection`;
             const profileQuoteCount = document.getElementById('profileQuoteCount');
             if (profileQuoteCount) profileQuoteCount.textContent = String(activeQuotes.length);
         }
