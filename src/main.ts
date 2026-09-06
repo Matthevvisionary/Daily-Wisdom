@@ -1,14 +1,16 @@
 ﻿// @ts-nocheck
 
+import { starterQuotes } from './data/starterQuotes.js';
+
         // Supabase client initialization 
         // Auth + RLS verified working (magic link)
-        const supabaseClient = window.supabase.createClient(
+        const supabaseClient = window.supabase?.createClient?.(
             "https://mmchlykmezehfmtdtjff.supabase.co",
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1tY2hseWttZXplaGZtdGR0amZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0NDQyODEsImV4cCI6MjA4NDAyMDI4MX0.J8lPRllK2BDuuME41N4G0-fB5EMdn2ePCZZwFLamP9U"
         );
         console.log("Supabase ready:", supabaseClient);
 
-        supabaseClient.auth.onAuthStateChange((event, session) => {
+        supabaseClient?.auth.onAuthStateChange((event, session) => {
             console.log("Auth event:", event);
             console.log("Session:", session);
 
@@ -163,6 +165,7 @@
         let authVerificationPromise = null;
 
         async function getVerifiedSession() {
+            if (!supabaseClient) return null;
             if (authVerificationPromise) return authVerificationPromise;
 
             authVerificationPromise = (async () => {
@@ -258,6 +261,9 @@
             }
 
             try {
+                if (!supabaseClient) {
+                    throw new Error('Cloud sync is unavailable while offline. Your built-in and local quotes are still available.');
+                }
                 if (mode === 'signIn') {
                     const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
                     if (error) throw error;
@@ -525,7 +531,7 @@
         let isSyncingLocalChanges = false;
 
         async function syncLocalChanges() {
-            if (isSyncingLocalChanges || !db || !navigator.onLine) return;
+            if (isSyncingLocalChanges || !db || !navigator.onLine || !supabaseClient) return;
 
             try {
                 isSyncingLocalChanges = true;
@@ -670,6 +676,24 @@
             });
         }
 
+        // Starter records are deliberately virtual. They participate in display,
+        // search, and filtering, but never enter IndexedDB or the sync queue.
+        const starterQuoteRecords = starterQuotes.map((quote, index) => Object.freeze({
+            ...quote,
+            id: quote.id,
+            image: null,
+            status: 'active',
+            createdAt: 0 - index,
+            deletedAt: null,
+            synced: true,
+            isStarterQuote: true
+        }));
+
+        async function getAvailableQuotes() {
+            const personalQuotes = await getAllQuotes();
+            return [...personalQuotes, ...starterQuoteRecords];
+        }
+
         function updateQuote(id, updates) {
             return new Promise((resolve, reject) => {
                 const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -803,7 +827,7 @@
         }
 
 
-        quoteHTML += `<div class="quote-meta">Added ${formatDateShort(dailyQuote.createdAt)}</div>`;
+        quoteHTML += `<div class="quote-meta">${dailyQuote.isStarterQuote ? 'Starter library' : `Added ${formatDateShort(dailyQuote.createdAt)}`}</div>`;
         quoteHTML += `</div>`;
 
         container.innerHTML = quoteHTML;
@@ -820,7 +844,7 @@
         }
 
         async function loadDailyQuote() {
-        const quotes = await getAllQuotes();
+        const quotes = await getAvailableQuotes();
         const activeQuotes = quotes.filter(q => q.status === 'active');
 
         const quoteContainer = document.getElementById('dailyQuoteContainer');
@@ -924,7 +948,7 @@
             selectedQuotes.clear();
             updateSelectionUI();
 
-            const quotes = await getAllQuotes();
+            const quotes = filter === 'active' ? await getAvailableQuotes() : await getAllQuotes();
             let filteredQuotes = [];
 
             if (filter === 'active') {
@@ -960,14 +984,14 @@
             filteredQuotes.sort((a, b) => b.createdAt - a.createdAt);
 
             grid.innerHTML = filteredQuotes.map(quote => `
-                <div class="gallery-item" data-id="${quote.id}">
+                <div class="gallery-item${quote.isStarterQuote ? ' starter-quote' : ''}" data-id="${quote.id}" data-starter-quote="${Boolean(quote.isStarterQuote)}">
                     <div class="selection-indicator">✓</div>
                     ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
                     <div class="gallery-item-content">
                         ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
                         ${quote.creator ? `<div class="gallery-item-creator">- ${quote.creator}</div>` : ''}
                         ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
-                        <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
+                        <div class="gallery-item-date">${quote.isStarterQuote ? 'Starter library' : formatDateShort(quote.createdAt)}</div>
                     </div>
                 </div>
             `).join('');
@@ -980,6 +1004,7 @@
 
         function toggleSelection(e) {
             const item = e.currentTarget;
+            if (item.dataset.starterQuote === 'true') return;
             const id = parseInt(item.dataset.id);
 
             if (selectedQuotes.has(id)) {
@@ -1352,7 +1377,7 @@
             const fromDate = document.getElementById('searchFromDate').value;
             const toDate = document.getElementById('searchToDate').value;
 
-            let quotes = await getAllQuotes();
+            let quotes = await getAvailableQuotes();
             quotes = quotes.filter(q => q.status === 'active');
 
             // Filter by keyword
@@ -1423,7 +1448,7 @@
                         ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
                         ${quote.creator ? `<div class="gallery-item-creator">- ${quote.creator}</div>` : ''}
                         ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
-                        <div class="gallery-item-date">${formatDateShort(quote.createdAt)}</div>
+                        <div class="gallery-item-date">${quote.isStarterQuote ? 'Starter library' : formatDateShort(quote.createdAt)}</div>
                     </div>
                 </div>
             `).join('');
@@ -1438,7 +1463,7 @@
             const quotes = await getAllQuotes();
             const activeQuotes = quotes.filter(q => q.status === 'active');
             document.getElementById('totalQuotesCount').textContent =
-                `${activeQuotes.length} quote${activeQuotes.length !== 1 ? 's' : ''} in collection`;
+                `${starterQuotes.length} built-in + ${activeQuotes.length} personal quote${activeQuotes.length !== 1 ? 's' : ''}`;
             const profileQuoteCount = document.getElementById('profileQuoteCount');
             if (profileQuoteCount) profileQuoteCount.textContent = String(activeQuotes.length);
         }
@@ -1541,12 +1566,12 @@
         });
 
         document.getElementById('clearDataBtn').addEventListener('click', () => {
-            showCustomConfirm('Are you sure you want to permanently delete all quotes? This action cannot be undone.', async () => {
+            showCustomConfirm('Are you sure you want to permanently delete all personal quotes? Built-in starter quotes will remain available.', async () => {
                 await clearAllData();
                 loadGallery(currentFilter);
                 loadDailyQuote();
                 updateSettingsStats();
-                showCustomAlert('All data has been cleared');
+                showCustomAlert('All personal quotes have been cleared. The built-in starter library remains available.');
             });
         });
 
@@ -1646,26 +1671,8 @@
                 localStorage.setItem('dailyInspoPreferences', JSON.stringify(preferences));
 
                 if (preferences.starterQuotes && !localStorage.getItem('dailyInspoStarterQuotesAdded')) {
-                    const starterQuotes = [
-                        { text: 'Your pace is still a pace.', creator: 'Daily Inspo' },
-                        { text: 'Pay attention to what makes you feel more like yourself.', creator: 'Daily Inspo' },
-                        { text: 'Begin with the next honest, possible thing.', creator: 'Daily Inspo' }
-                    ];
-
-                    for (const starter of starterQuotes) {
-                        await addQuote({
-                            client_id: crypto.randomUUID(),
-                            text: starter.text,
-                            creator: starter.creator,
-                            source: 'Starter collection',
-                            image: null,
-                            status: 'active',
-                            createdAt: Date.now(),
-                            deletedAt: null,
-                            synced: false
-                        });
-                    }
-
+                    // The starter library is bundled and virtual, so onboarding
+                    // never copies it into a user's local or cloud collection.
                     localStorage.setItem('dailyInspoStarterQuotesAdded', 'true');
                 }
             } catch (error) {

@@ -2413,6 +2413,14 @@
             border-color: rgba(243,240,232,.42);
         }
 
+        .gallery-item.starter-quote {
+            cursor: default;
+        }
+
+        .gallery-item.starter-quote .selection-indicator {
+            display: none;
+        }
+
         .gallery-item-content {
             padding: 27px;
         }
