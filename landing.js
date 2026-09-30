@@ -1,6 +1,8 @@
-const appUrl = 'app/';
+const appUrl = new URL('app/', document.baseURI).href;
 const startedKey = 'dailyInspoStarted';
 const supabaseSessionKey = 'sb-mmchlykmezehfmtdtjff-auth-token';
+const landingPreviewRequested = new URLSearchParams(window.location.search).has('landing');
+const isExplicitLandingRoute = /\/landing\/?$/.test(window.location.pathname) || landingPreviewRequested;
 const landingMenuToggle = document.getElementById('landingMenuToggle');
 const landingNav = document.getElementById('landingNav');
 const onboardingModal = document.getElementById('onboardingModal');
@@ -80,7 +82,15 @@ async function routeReturningVisitor() {
 
 // Never leave the marketing page hidden if a browser storage API stalls.
 const routingFallback = window.setTimeout(revealLanding, 1800);
-routeReturningVisitor().finally(() => window.clearTimeout(routingFallback));
+if (isExplicitLandingRoute) {
+    if (landingPreviewRequested) {
+        window.history.replaceState(null, '', new URL('landing/', document.baseURI).pathname);
+    }
+    revealLanding();
+    window.clearTimeout(routingFallback);
+} else {
+    routeReturningVisitor().finally(() => window.clearTimeout(routingFallback));
+}
 
 function getFocusableElements(container) {
     return Array.from(container.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'));

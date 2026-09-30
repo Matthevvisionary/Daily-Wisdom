@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Learn about Daily Inspo, a personal home for words worth keeping.">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <title>About Daily Inspo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400;1,500;1,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            color: #181818;
+            background: #f7f4ed;
+            font-family: 'Work Sans', sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body { margin: 0; }
+
+        .site-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 88px;
+            padding: 0 4.5vw;
+            color: #f7f4ed;
+            background: #090909;
+            border-bottom: 1px solid rgba(255, 255, 255, .16);
+        }
+
+        .brand-mark {
+            display: grid;
+            place-items: center;
+            width: 46px;
+            height: 46px;
+            color: #f7f4ed;
+            border: 1px solid rgba(255, 255, 255, .45);
+            border-radius: 50%;
+            transition: color .2s ease, background .2s ease;
+        }
+
+        .brand-mark:hover { color: #090909; background: #f7f4ed; }
+
+        .brand-mark svg {
+            width: 27px;
+            height: 27px;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 2.4;
+        }
+
+        .back-link {
+            color: #f7f4ed;
+            font-size: .7rem;
+            font-weight: 600;
+            letter-spacing: .14em;
+            text-decoration: none;
+            text-transform: uppercase;
+        }
+
+        .back-link:hover { color: rgba(247, 244, 237, .65); }
+        .back-link:focus-visible, .brand-mark:focus-visible { outline: 2px solid #f7f4ed; outline-offset: 4px; }
+
+        .about-hero {
+            padding: clamp(90px, 15vw, 180px) 7vw clamp(74px, 11vw, 132px);
+            background: #090909;
+            color: #f7f4ed;
+        }
+
+        .eyebrow {
+            margin: 0 0 22px;
+            color: rgba(247, 244, 237, .45);
+            font-size: .68rem;
+            font-weight: 600;
+            letter-spacing: .17em;
+            text-transform: uppercase;
+        }
+
+        h1, h2, p { margin-top: 0; }
+
+        h1 {
+            max-width: 800px;
+            margin-bottom: 24px;
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: clamp(4rem, 10vw, 8.4rem);
+            font-weight: 400;
+            letter-spacing: -.055em;
+            line-height: .84;
+        }
+
+        .hero-intro {
+            max-width: 460px;
+            margin: 0;
+            color: rgba(247, 244, 237, .68);
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: clamp(1.35rem, 2.1vw, 1.75rem);
+            line-height: 1.25;
+        }
+
+        .about-content {
+            width: min(100% - 44px, 760px);
+            margin: 0 auto;
+            padding: clamp(72px, 11vw, 128px) 0;
+        }
+
+        .about-section {
+            padding: 0 0 clamp(62px, 9vw, 106px);
+        }
+
+        .about-section:last-child { padding-bottom: 0; }
+
+        h2 {
+            max-width: 610px;
+            margin-bottom: 26px;
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: clamp(2.4rem, 5vw, 4.2rem);
+            font-weight: 400;
+            letter-spacing: -.03em;
+            line-height: .98;
+        }
+
+        .about-section p {
+            max-width: 610px;
+            margin-bottom: 21px;
+            color: #5a524a;
+            font-size: clamp(1rem, 1.45vw, 1.12rem);
+            line-height: 1.72;
+        }
+
+        .about-section p:last-child { margin-bottom: 0; }
+
+        .closing { padding-top: 8px; }
+
+        .closing p {
+            margin-bottom: 8px;
+            color: #181818;
+            font-family: 'Crimson Pro', Georgia, serif;
+            font-size: clamp(1.7rem, 3.5vw, 2.75rem);
+            line-height: 1.12;
+        }
+
+        .closing strong { color: #181818; font-weight: 600; }
+
+        .site-footer {
+            padding: 31px 7vw;
+            color: rgba(250, 248, 245, .58);
+            background: #090909;
+            font-size: .68rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 680px) {
+            .site-header { min-height: 76px; padding: 0 22px; }
+            .brand-mark { width: 42px; height: 42px; }
+            .about-hero { padding-right: 22px; padding-left: 22px; }
+            .about-content { width: min(100% - 44px, 760px); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { transition-duration: .01ms !important; }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand-mark" href="../" aria-label="Daily Inspo home">
+            <svg viewBox="0 0 44 44" aria-hidden="true">
+                <path d="M12 6.5h11.2c7.4 0 12.3 4.1 12.3 10.5 0 5.1-3.3 8.6-8.5 9.8L18 37.5V27h-6V6.5Z" />
+                <path d="M18 12.5h5c3.7 0 6 1.7 6 4.7 0 3.1-2.3 4.8-6 4.8h-5v-9.5Z" />
+            </svg>
+        </a>
+        <a class="back-link" href="../">Back to home</a>
+    </header>
+
+    <main>
+        <section class="about-hero" aria-labelledby="about-title">
+            <p class="eyebrow">Daily Inspo</p>
+            <h1 id="about-title">About Daily Inspo</h1>
+            <p class="hero-intro">A personal home for words worth keeping.</p>
+        </section>
+
+        <article class="about-content">
+            <section class="about-section" aria-labelledby="personal-title">
+                <h2 id="personal-title">Inspiration should feel personal.</h2>
+                <p>Daily Inspo was built around a simple idea: the words that stay with us are rarely random.</p>
+                <p>They might come from a book you read years ago, something a friend told you at exactly the right time, a line from an interview, or a quote you stumbled across when you needed it most. Whatever the source, some words are worth keeping.</p>
+                <p>Daily Inspo gives those words a place to live.</p>
+                <p>Instead of letting meaningful quotes disappear into screenshots, notes apps, bookmarks, or forgotten folders, you can build a personal collection of inspiration and return to it whenever you need it.</p>
+            </section>
+
+            <section class="about-section" aria-labelledby="remember-title">
+                <h2 id="remember-title">Open it. Find something worth remembering.</h2>
+                <p>Every time you open Daily Inspo, you’re greeted with a quote.</p>
+                <p>It might be something from Daily Inspo’s built-in collection or something you added yourself. The goal is simple: turn opening the app into a small moment of discovery, reflection, or motivation.</p>
+                <p>Your collection can grow with you. Add the words that matter. Revisit the ones you’ve forgotten. Keep the ones that still mean something.</p>
+                <p>Because inspiration doesn’t always have to come from somewhere new. Sometimes you just need to rediscover something you already found.</p>
+            </section>
+
+            <section class="about-section" aria-labelledby="your-way-title">
+                <h2 id="your-way-title">Your inspiration, your way.</h2>
+                <p>Daily Inspo was designed to feel less like an endless content feed and more like your own personal library.</p>
+                <p>You decide what deserves a place in it.</p>
+                <p>Save quotes you love. Add your own. Build a collection that reflects the ideas, people, and perspectives that matter to you.</p>
+                <p>And because inspiration shouldn’t disappear the moment your connection does, Daily Inspo is being built with offline use in mind so your collection can stay accessible wherever you are.</p>
+            </section>
+
+            <section class="about-section closing" aria-labelledby="more-title">
+                <h2 id="more-title">More than quotes.</h2>
+                <p>Daily Inspo began with quotes, but the larger idea is about creating a place for meaningful ideas to be discovered, collected, and shared.</p>
+                <p>As Daily Inspo grows, the goal is to make it a home not only for the words worth keeping, but also for the writers, stories, and ideas behind them.</p>
+                <p>A place to find something worth thinking about.</p>
+                <p>A place to keep what you don’t want to forget.</p>
+                <p><strong>Find something worth keeping.</strong></p>
+            </section>
+        </article>
+    </main>
+
+    <footer class="site-footer">© 2026 Daily Inspo</footer>
+</body>
+</html>
