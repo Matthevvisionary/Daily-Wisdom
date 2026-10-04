@@ -229,6 +229,17 @@
             </div>
 
             <div class="settings-section">
+                <h2 class="settings-section-title">Daily Inspo</h2>
+                <div class="settings-item settings-feedback-row">
+                    <div>
+                        <div class="settings-item-label">Send Feedback</div>
+                        <div class="settings-item-description">Share an idea, a snag, or anything on your mind.</div>
+                    </div>
+                    <button class="btn btn-secondary" id="openFeedbackBtn" type="button">Send Feedback</button>
+                </div>
+            </div>
+
+            <div class="settings-section">
                 <h2 class="settings-section-title">Data Management</h2>
                 <div class="settings-item">
                     <div>
@@ -314,6 +325,40 @@
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="cancelAddBtn">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="saveQuoteBtn">Add Quote</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div class="modal feedback-modal" id="feedbackModal" aria-labelledby="feedbackModalTitle">
+        <div class="modal-content feedback-modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="feedbackModalTitle">Send Feedback</h2>
+                <button class="modal-close" id="closeFeedbackModal" type="button" aria-label="Close feedback form">×</button>
+            </div>
+            <p class="feedback-intro">A few words can help shape what Daily Inspo becomes next.</p>
+            <form id="feedbackForm">
+                <div class="form-group">
+                    <label class="form-label" for="feedbackCategory">What would you like to share?</label>
+                    <select class="form-input feedback-select" id="feedbackCategory" name="category">
+                        <option value="General Feedback">General Feedback</option>
+                        <option value="Feature Request">Feature Request</option>
+                        <option value="Bug Report">Bug Report</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="feedbackMessage">Message</label>
+                    <textarea class="form-textarea" id="feedbackMessage" name="message" maxlength="5000" required placeholder="Tell us what you think..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="feedbackEmail">Email <span class="feedback-optional">(optional)</span></label>
+                    <input class="form-input" id="feedbackEmail" name="email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com">
+                </div>
+                <p class="feedback-message" id="feedbackMessageStatus" aria-live="polite"></p>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelFeedbackBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitFeedbackBtn">Send Feedback</button>
                 </div>
             </form>
         </div>

@@ -398,6 +398,102 @@ function closeAuthModal() {
         closeManagedModal(authModal);
     }
 }
+const FEEDBACK_CATEGORIES = new Set(['General Feedback', 'Feature Request', 'Bug Report']);
+const MAX_FEEDBACK_MESSAGE_LENGTH = 5000;
+const MAX_FEEDBACK_EMAIL_LENGTH = 254;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+let isFeedbackSubmitting = false;
+function setFeedbackStatus(message = '', type = '') {
+    const status = document.getElementById('feedbackMessageStatus');
+    if (!status)
+        return;
+    status.textContent = message;
+    status.classList.toggle('is-error', type === 'error');
+    status.classList.toggle('is-success', type === 'success');
+}
+async function openFeedbackModal() {
+    const feedbackModal = document.getElementById('feedbackModal');
+    const emailInput = document.getElementById('feedbackEmail');
+    setFeedbackStatus();
+    // getSession reads the locally available session, so this can still prefill
+    // an account email without changing the app's offline quote behavior.
+    if (emailInput && !emailInput.value && supabaseClient) {
+        const { data } = await supabaseClient.auth.getSession();
+        const accountEmail = data?.session?.user?.email;
+        if (accountEmail)
+            emailInput.value = accountEmail;
+    }
+    if (feedbackModal) {
+        openManagedModal(feedbackModal, {
+            initialFocus: document.getElementById('feedbackMessage')
+        });
+    }
+}
+function closeFeedbackModal() {
+    closeManagedModal(document.getElementById('feedbackModal'));
+}
+async function submitFeedback(event) {
+    event.preventDefault();
+    if (isFeedbackSubmitting)
+        return;
+    const category = document.getElementById('feedbackCategory').value;
+    const message = document.getElementById('feedbackMessage').value.trim();
+    const email = document.getElementById('feedbackEmail').value.trim();
+    setFeedbackStatus();
+    if (!FEEDBACK_CATEGORIES.has(category)) {
+        setFeedbackStatus('Please choose a feedback category.', 'error');
+        return;
+    }
+    if (!message) {
+        setFeedbackStatus('Please write a message before sending.', 'error');
+        document.getElementById('feedbackMessage').focus();
+        return;
+    }
+    if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
+        setFeedbackStatus('Please keep your message under 5,000 characters.', 'error');
+        return;
+    }
+    if (email && (email.length > MAX_FEEDBACK_EMAIL_LENGTH || !emailPattern.test(email))) {
+        setFeedbackStatus('Please enter a valid email address, or leave it blank.', 'error');
+        document.getElementById('feedbackEmail').focus();
+        return;
+    }
+    if (!navigator.onLine) {
+        setFeedbackStatus("You're offline. Connect to the internet to send your feedback.", 'error');
+        return;
+    }
+    if (!supabaseClient) {
+        setFeedbackStatus('Feedback is temporarily unavailable. Please try again soon.', 'error');
+        return;
+    }
+    const submitButton = document.getElementById('submitFeedbackBtn');
+    const originalButtonText = submitButton.textContent;
+    try {
+        isFeedbackSubmitting = true;
+        submitButton.disabled = true;
+        submitButton.textContent = 'Sending…';
+        const { data, error } = await supabaseClient.functions.invoke('submit-feedback', {
+            body: {
+                category,
+                message,
+                email: email || null
+            }
+        });
+        if (error || !data?.stored)
+            throw error || new Error('Feedback was not stored.');
+        document.getElementById('feedbackForm').reset();
+        setFeedbackStatus('Thanks for helping make Daily Inspo better.', 'success');
+    }
+    catch (error) {
+        console.error('Feedback submission failed:', error);
+        setFeedbackStatus('We couldn’t send your feedback right now. Please try again.', 'error');
+    }
+    finally {
+        isFeedbackSubmitting = false;
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+    }
+}
 async function handleSignOut() {
     await supabaseClient.auth.signOut();
     closeAuthModal();
@@ -1382,6 +1478,10 @@ document.getElementById('createAccountBtn').addEventListener('click', () => {
     const nextMode = currentAuthMode === 'signUp' ? 'signIn' : 'signUp';
     openAuthModal(nextMode);
 });
+document.getElementById('openFeedbackBtn').addEventListener('click', openFeedbackModal);
+document.getElementById('closeFeedbackModal').addEventListener('click', closeFeedbackModal);
+document.getElementById('cancelFeedbackBtn').addEventListener('click', closeFeedbackModal);
+document.getElementById('feedbackForm').addEventListener('submit', submitFeedback);
 document.getElementById('clearDataBtn').addEventListener('click', () => {
     showCustomConfirm('Are you sure you want to permanently delete all personal quotes? Built-in starter quotes will remain available.', async () => {
         await clearAllData();

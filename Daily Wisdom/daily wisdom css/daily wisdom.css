@@ -571,6 +571,48 @@
             color: var(--text-secondary);
         }
 
+        .feedback-modal-content {
+            max-width: 520px;
+        }
+
+        .feedback-intro {
+            margin: -8px 0 24px;
+            color: var(--text-secondary);
+            font: 400 1.12rem/1.45 'Crimson Pro', serif;
+        }
+
+        .feedback-select {
+            appearance: auto;
+            cursor: pointer;
+        }
+
+        .feedback-optional {
+            color: var(--text-tertiary);
+            font-weight: 400;
+        }
+
+        .feedback-message {
+            min-height: 1.4em;
+            margin-top: -4px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .feedback-message.is-error {
+            color: var(--error);
+        }
+
+        .feedback-message.is-success {
+            color: var(--success);
+        }
+
+        .feedback-modal .btn[disabled] {
+            cursor: wait;
+            opacity: 0.65;
+            transform: none;
+        }
+
         .toggle-switch {
             position: relative;
             width: 60px;

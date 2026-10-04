@@ -1,0 +1,5 @@
+[functions.submit-feedback]
+# Guests can submit feedback using the project's public anonymous JWT; signed-in
+# users automatically send their user JWT through supabase-js. Keep this on so
+# arbitrary unauthenticated requests are rejected at the Supabase gateway.
+verify_jwt = true
