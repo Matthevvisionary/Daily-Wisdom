@@ -11,19 +11,49 @@ import { starterQuotes } from './data/starterQuotes.js';
         console.log("Supabase ready:", supabaseClient);
 
         supabaseClient?.auth.onAuthStateChange((event, session) => {
-            console.log("Auth event:", event);
-            console.log("Session:", session);
-
             updateAuthUI(session);
 
-            if (session) {
+            // initApp handles INITIAL_SESSION after IndexedDB is ready. A real
+            // sign-in needs to restore the cloud copy before pushing local work.
+            if (session && event === 'SIGNED_IN') {
                 localStorage.setItem('dailyInspoStarted', 'true');
-                loadQuotes(session.user.id);
-                syncLocalChanges();
+                restoreCloudQuotesThenSync(session.user.id);
             }
         });
 
-        async function loadQuotes(userId) {
+        let quoteRestorePromise = null;
+
+        function toLocalTimestamp(value, fallback = Date.now()) {
+            if (typeof value === 'number' && Number.isFinite(value)) return value;
+            if (typeof value === 'string') {
+                const parsed = Date.parse(value);
+                if (Number.isFinite(parsed)) return parsed;
+            }
+            return fallback;
+        }
+
+        async function getCloudQuoteImage(imagePath) {
+            if (!imagePath) return null;
+
+            try {
+                // Downloading works for both public and private buckets under the
+                // user's storage policy. The object URL is recreated on each restore.
+                const { data, error } = await supabaseClient.storage
+                    .from('quote-images')
+                    .download(imagePath);
+                if (error) throw error;
+                return URL.createObjectURL(data);
+            } catch (error) {
+                console.warn('Could not restore quote image:', error);
+                return null;
+            }
+        }
+
+        async function restoreCloudQuotes(userId) {
+            if (!db || !supabaseClient || !navigator.onLine) return;
+            if (quoteRestorePromise) return quoteRestorePromise;
+
+            quoteRestorePromise = (async () => {
             const { data, error } = await supabaseClient
                 .from("quotes")
                 .select("*")
@@ -31,12 +61,62 @@ import { starterQuotes } from './data/starterQuotes.js';
                 .order("createdAt", { ascending: false });
 
             if (error) {
-                console.error("Error loading quotes:", error);
-                return;
+                throw error;
             }
 
-            console.log("Loaded quotes:", data);
+                const localQuotes = await getAllQuotes();
+                const localQuotesByClientId = new Map(
+                    localQuotes
+                        .filter(quote => quote.client_id)
+                        .map(quote => [quote.client_id, quote])
+                );
 
+                for (const cloudQuote of data || []) {
+                    // client_id is the cross-device identity. Records without one
+                    // cannot safely be deduplicated, so leave them on the server.
+                    if (!cloudQuote.client_id) continue;
+
+                    const existingQuote = localQuotesByClientId.get(cloudQuote.client_id);
+
+                    // Never overwrite a local edit that still needs to be uploaded.
+                    if (existingQuote && !existingQuote.synced) continue;
+
+                    const localQuote = {
+                        client_id: cloudQuote.client_id,
+                        text: normalizeQuoteText(cloudQuote.text) || null,
+                        creator: cloudQuote.creator || null,
+                        source: cloudQuote.source || null,
+                        image: await getCloudQuoteImage(cloudQuote.image_path),
+                        status: cloudQuote.status || 'active',
+                        createdAt: toLocalTimestamp(cloudQuote.createdAt ?? cloudQuote.created_at),
+                        deletedAt: cloudQuote.deletedAt
+                            ? toLocalTimestamp(cloudQuote.deletedAt)
+                            : null,
+                        synced: true
+                    };
+
+                    if (existingQuote) {
+                        await updateQuote(existingQuote.id, localQuote);
+                    } else {
+                        await addQuote(localQuote);
+                    }
+                }
+            })();
+
+            try {
+                await quoteRestorePromise;
+            } finally {
+                quoteRestorePromise = null;
+            }
+        }
+
+        async function restoreCloudQuotesThenSync(userId) {
+            try {
+                await restoreCloudQuotes(userId);
+                await syncLocalChanges();
+            } catch (error) {
+                console.warn('Cloud quote restore unavailable; continuing with local quotes:', error);
+            }
         }
 
         function normalizeQuoteText(value) {
@@ -1870,8 +1950,10 @@ import { starterQuotes } from './data/starterQuotes.js';
             await handleEntryAction();
 
             try {
-                await getVerifiedSession();
-                await syncLocalChanges();
+                const session = await getVerifiedSession();
+                if (session?.user) {
+                    await restoreCloudQuotesThenSync(session.user.id);
+                }
             } catch (error) {
                 console.warn('Cloud sync unavailable; continuing with local quotes:', error);
             }
