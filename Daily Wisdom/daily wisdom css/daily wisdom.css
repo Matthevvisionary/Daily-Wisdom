@@ -3187,3 +3187,75 @@
             background: #f3f0e8;
             border-color: #121212;
         }
+
+        /*
+         * The feed is a reading surface on mobile, not a long document. Keep its
+         * normal state within the visible viewport and reserve just enough room
+         * for the floating navigation. The feed itself can still scroll when a
+         * large accessibility text size, a very small viewport, or an unusually
+         * long quote needs more room.
+         */
+        @media (max-width: 760px) {
+            body:not(.landing-active):has(#homeScreen.active) {
+                height: 100svh;
+                min-height: 100svh;
+                padding-bottom: 0;
+                overflow: hidden;
+            }
+
+            body:not(.landing-active) #homeScreen {
+                height: calc(100svh - 66px);
+                min-height: 0;
+                padding: 10px 22px calc(76px + env(safe-area-inset-bottom));
+                overflow-y: auto;
+                overscroll-behavior-y: contain;
+                scrollbar-gutter: stable;
+            }
+
+            body:not(.landing-active) #homeScreen .home-container {
+                justify-content: flex-start;
+                min-height: 100%;
+                height: 100%;
+                padding: 0;
+            }
+
+            #homeScreen .date-display {
+                margin-bottom: 5px;
+            }
+
+            #homeScreen .feed-heading {
+                margin: 0 auto 9px;
+            }
+
+            #homeScreen .app-kicker {
+                margin-bottom: 6px;
+            }
+
+            #homeScreen .quote-wrapper {
+                grid-template-rows: minmax(0, 1fr) auto;
+                flex: 1 1 auto;
+                min-height: 0;
+                gap: 12px 18px;
+                padding: 0 0 2px;
+            }
+
+            #homeScreen #dailyQuoteContainer {
+                align-self: center;
+            }
+
+            body:not(.landing-active) #homeScreen .quote-card {
+                padding: 8px 4px;
+            }
+
+            body:not(.landing-active) #homeScreen .quote-text {
+                margin-bottom: 18px;
+            }
+
+            body:not(.landing-active) #homeScreen .quote-creator {
+                margin-bottom: 6px;
+            }
+
+            body:not(.landing-active) #homeScreen .quote-meta {
+                margin-top: 14px;
+            }
+        }
