@@ -3209,7 +3209,6 @@
                 padding: 10px 22px calc(76px + env(safe-area-inset-bottom));
                 overflow-y: auto;
                 overscroll-behavior-y: contain;
-                scrollbar-gutter: stable;
             }
 
             body:not(.landing-active) #homeScreen .home-container {
@@ -3232,9 +3231,11 @@
             }
 
             #homeScreen .quote-wrapper {
-                grid-template-rows: minmax(0, 1fr) auto;
+                /* Keep the card in its grid row. When it cannot fit, this row
+                   grows and the feed's own overflow becomes the fallback. */
+                grid-template-rows: minmax(min-content, 1fr) auto;
                 flex: 1 1 auto;
-                min-height: 0;
+                min-height: min-content;
                 gap: 12px 18px;
                 padding: 0 0 2px;
             }
@@ -3249,6 +3250,13 @@
 
             body:not(.landing-active) #homeScreen .quote-text {
                 margin-bottom: 18px;
+            }
+
+            /* A multi-line "medium" quote needs less display scale than a
+               two-word quote to preserve the fixed reading surface. */
+            body:not(.landing-active) #homeScreen .quote-length-medium .quote-text {
+                font-size: clamp(2.6rem, 12.5vw, 3.5rem);
+                line-height: 1.02;
             }
 
             body:not(.landing-active) #homeScreen .quote-creator {
