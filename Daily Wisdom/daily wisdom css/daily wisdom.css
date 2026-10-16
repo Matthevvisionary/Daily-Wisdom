@@ -3233,17 +3233,37 @@
             }
 
             #homeScreen .quote-wrapper {
-                /* Keep the card in its grid row. When it cannot fit, this row
-                   grows and the feed's own overflow becomes the fallback. */
-                grid-template-rows: minmax(min-content, 1fr) auto;
+                /* The arrow rail is independent of the card, so a tall quote
+                   can never push the controls into the fixed navigation. */
+                position: relative;
+                grid-template-columns: 1fr;
+                grid-template-rows: minmax(min-content, 1fr);
                 flex: 1 1 auto;
                 min-height: min-content;
-                gap: 12px 18px;
-                padding: 0 0 10px;
+                gap: 0;
+                padding: 0 0 62px;
             }
 
             #homeScreen #dailyQuoteContainer {
                 align-self: center;
+            }
+
+            #homeScreen .quote-arrow {
+                position: absolute;
+                grid-column: auto;
+                grid-row: auto;
+                bottom: 10px;
+                z-index: 1;
+            }
+
+            #homeScreen .quote-arrow.left {
+                left: 0;
+                right: auto;
+            }
+
+            #homeScreen .quote-arrow.right {
+                right: 0;
+                left: auto;
             }
 
             body:not(.landing-active) #homeScreen .quote-card {
