@@ -3206,7 +3206,9 @@
             body:not(.landing-active) #homeScreen {
                 height: calc(100svh - 66px);
                 min-height: 0;
-                padding: 10px 22px calc(76px + env(safe-area-inset-bottom));
+                /* The fixed nav, its raised add button, and the arrow row must
+                   never occupy the same physical space. */
+                padding: 10px 22px calc(118px + env(safe-area-inset-bottom));
                 overflow-y: auto;
                 overscroll-behavior-y: contain;
             }
@@ -3237,7 +3239,7 @@
                 flex: 1 1 auto;
                 min-height: min-content;
                 gap: 12px 18px;
-                padding: 0 0 2px;
+                padding: 0 0 10px;
             }
 
             #homeScreen #dailyQuoteContainer {
