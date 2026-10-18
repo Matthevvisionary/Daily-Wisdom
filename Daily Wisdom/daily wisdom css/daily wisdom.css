@@ -3163,6 +3163,15 @@
             color: var(--app-on-contrast);
         }
 
+        body:not(.landing-active) .collection-empty-state-icon {
+            display: block;
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 20px;
+            color: var(--app-on-contrast);
+            opacity: 0.72;
+        }
+
         .context-search svg {
             stroke: var(--app-on-contrast);
         }

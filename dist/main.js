@@ -1098,10 +1098,12 @@ async function loadGallery(filter = 'active') {
     }
     const grid = document.getElementById('galleryGrid');
     if (filteredQuotes.length === 0) {
-        const icon = filter === 'deleted' ? '🗑️' : '📭';
+        const icon = filter === 'deleted' ? 'collection-trash' : 'collection-archive';
         grid.innerHTML = `
                     <div class="empty-state" style="grid-column: 1 / -1;">
-                    <div class="empty-state-icon">${icon}</div>
+                    <svg class="empty-state-icon collection-empty-state-icon" aria-hidden="true" focusable="false" viewBox="0 0 32 32">
+                        <use href="../assets/icons/collection.svg#${icon}"></use>
+                    </svg>
                     <div class="empty-state-text">No ${filter} quotes found</div>
                     </div>
                 `;

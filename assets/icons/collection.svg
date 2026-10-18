@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="collection-archive" viewBox="0 0 32 32">
+    <path d="M5 8.5h22v18H5z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.75"/>
+    <path d="M3.5 5h25v4.5h-25zM12 15.5h8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"/>
+  </symbol>
+  <symbol id="collection-trash" viewBox="0 0 32 32">
+    <path d="M6.5 9.5h19l-1.25 17h-16.5zM4 6.5h24M12.5 6.5l1-2h5l1 2M12 14v8M16 14v8M20 14v8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"/>
+  </symbol>
+</svg>
