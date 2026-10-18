@@ -127,7 +127,9 @@ function escapeHtml(value) {
 }
 function getQuoteLengthClass(value) {
     const length = normalizeQuoteText(value).length;
-    if (length <= 55)
+    // Reserve the display-sized treatment for an actual short phrase.
+    // A 40–55 character quote frequently wraps to several mobile lines.
+    if (length <= 32)
         return 'quote-length-short';
     if (length <= 140)
         return 'quote-length-medium';
@@ -1014,6 +1016,64 @@ if (prevBtn)
 if (nextBtn)
     nextBtn.addEventListener('click', showNextQuote);
 // Gallery Management
+function quoteReaderCard(quote, { selectable = false } = {}) {
+    const quoteId = escapeHtml(String(quote.id));
+    const quoteText = normalizeQuoteText(quote.text);
+    const quoteImage = quote.image ? escapeHtml(quote.image) : '';
+    const creator = quote.creator ? escapeHtml(quote.creator) : '';
+    const source = quote.source ? escapeHtml(quote.source) : '';
+    const dateLabel = quote.isStarterQuote ? 'Starter library' : formatDateShort(quote.createdAt);
+    return `
+                <div class="gallery-item${quote.isStarterQuote ? ' starter-quote' : ''}"${selectable ? ` data-id="${quoteId}" data-starter-quote="${Boolean(quote.isStarterQuote)}"` : ''}>
+                    ${selectable ? '<div class="selection-indicator">✓</div>' : ''}
+                    ${quoteImage ? `<button class="quote-reader-trigger quote-image-reader" type="button" data-quote-id="${quoteId}" aria-label="Open quote image">\n                        <img src="${quoteImage}" alt="Quote image" class="gallery-item-image">\n                    </button>` : ''}
+                    <div class="gallery-item-content">
+                        ${quoteText ? `<button class="gallery-item-text quote-reader-trigger" type="button" data-quote-id="${quoteId}" aria-label="Read the full quote">${escapeHtml(quoteText)}</button>` : ''}
+                        ${creator ? `<div class="gallery-item-creator">- ${creator}</div>` : ''}
+                        ${source ? `<div class="gallery-item-source">${source}</div>` : ''}
+                        <div class="gallery-item-date">${dateLabel}</div>
+                    </div>
+                </div>
+            `;
+}
+function closeQuoteReader() {
+    closeManagedModal(document.getElementById('quoteReaderModal'));
+}
+function openQuoteReader(quote) {
+    const modal = document.getElementById('quoteReaderModal');
+    const text = normalizeQuoteText(quote.text);
+    const readerText = document.getElementById('quoteReaderText');
+    const readerCreator = document.getElementById('quoteReaderCreator');
+    const readerSource = document.getElementById('quoteReaderSource');
+    const readerImage = document.getElementById('quoteReaderImage');
+    const closeButton = document.getElementById('closeQuoteReader');
+    readerText.textContent = text ? `“${text}”` : 'Quote image';
+    readerCreator.textContent = quote.creator ? `— ${quote.creator}` : '';
+    readerCreator.classList.toggle('hidden', !quote.creator);
+    readerSource.textContent = quote.source || '';
+    readerSource.classList.toggle('hidden', !quote.source);
+    if (quote.image) {
+        readerImage.src = quote.image;
+        readerImage.alt = text ? 'Image attached to this quote' : 'Quote image';
+        readerImage.classList.remove('hidden');
+    }
+    else {
+        readerImage.removeAttribute('src');
+        readerImage.classList.add('hidden');
+    }
+    openManagedModal(modal, { initialFocus: closeButton });
+}
+function bindQuoteReaderTriggers(container, quotes) {
+    const quotesById = new Map(quotes.map(quote => [String(quote.id), quote]));
+    container.querySelectorAll('.quote-reader-trigger').forEach(trigger => {
+        trigger.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const quote = quotesById.get(trigger.dataset.quoteId);
+            if (quote)
+                openQuoteReader(quote);
+        });
+    });
+}
 async function loadGallery(filter = 'active') {
     currentFilter = filter;
     selectedQuotes.clear();
@@ -1049,22 +1109,12 @@ async function loadGallery(filter = 'active') {
     }
     // Sort by creation date, newest first
     filteredQuotes.sort((a, b) => b.createdAt - a.createdAt);
-    grid.innerHTML = filteredQuotes.map(quote => `
-                <div class="gallery-item${quote.isStarterQuote ? ' starter-quote' : ''}" data-id="${quote.id}" data-starter-quote="${Boolean(quote.isStarterQuote)}">
-                    <div class="selection-indicator">✓</div>
-                    ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
-                    <div class="gallery-item-content">
-                        ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
-                        ${quote.creator ? `<div class="gallery-item-creator">- ${quote.creator}</div>` : ''}
-                        ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
-                        <div class="gallery-item-date">${quote.isStarterQuote ? 'Starter library' : formatDateShort(quote.createdAt)}</div>
-                    </div>
-                </div>
-            `).join('');
+    grid.innerHTML = filteredQuotes.map(quote => quoteReaderCard(quote, { selectable: true })).join('');
     // Add click handlers for selection
-    document.querySelectorAll('.gallery-item').forEach(item => {
+    grid.querySelectorAll('.gallery-item').forEach(item => {
         item.addEventListener('click', toggleSelection);
     });
+    bindQuoteReaderTriggers(grid, filteredQuotes);
 }
 function toggleSelection(e) {
     const item = e.currentTarget;
@@ -1150,6 +1200,8 @@ document.getElementById('addQuoteBtn').addEventListener('click', openAddModal);
 document.getElementById('mobileAddQuoteBtn').addEventListener('click', openAddModal);
 document.getElementById('closeAddModal').addEventListener('click', closeAddModal);
 document.getElementById('cancelAddBtn').addEventListener('click', closeAddModal);
+document.getElementById('closeQuoteReader').addEventListener('click', closeQuoteReader);
+document.getElementById('closeQuoteReaderBtn').addEventListener('click', closeQuoteReader);
 // File upload
 document.getElementById('fileUploadArea').addEventListener('click', () => {
     document.getElementById('quoteImage').click();
@@ -1437,17 +1489,8 @@ async function performSearch() {
                 `;
         return;
     }
-    resultsGrid.innerHTML = quotes.map(quote => `
-                <div class="gallery-item">
-                    ${quote.image ? `<img src="${quote.image}" alt="Quote" class="gallery-item-image">` : ''}
-                    <div class="gallery-item-content">
-                        ${quote.text ? `<div class="gallery-item-text">${quote.text}</div>` : ''}
-                        ${quote.creator ? `<div class="gallery-item-creator">- ${quote.creator}</div>` : ''}
-                        ${quote.source ? `<div class="gallery-item-source">${quote.source}</div>` : ''}
-                        <div class="gallery-item-date">${quote.isStarterQuote ? 'Starter library' : formatDateShort(quote.createdAt)}</div>
-                    </div>
-                </div>
-            `).join('');
+    resultsGrid.innerHTML = quotes.map(quote => quoteReaderCard(quote)).join('');
+    bindQuoteReaderTriggers(resultsGrid, quotes);
 }
 // Settings
 darkModeToggle.addEventListener('change', (e) => {

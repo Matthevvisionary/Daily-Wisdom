@@ -32,11 +32,11 @@
     <!-- Feed Screen -->
     <div id="homeScreen" class="screen active">
         <div class="home-container">
+            <div class="date-display" id="currentDate"></div>
             <div class="feed-heading">
                 <p class="app-kicker">From your collection</p>
                 <h1>A word for <em>today.</em></h1>
             </div>
-            <div class="date-display" id="currentDate"></div>
             <div class="quote-wrapper">
                 <button id="prevQuoteBtn" class="quote-arrow left hidden" aria-label="Previous Quote">←</button>
                 <div id="dailyQuoteContainer" aria-live="polite"></div>
@@ -329,6 +329,23 @@
                     <button type="submit" class="btn btn-primary" id="saveQuoteBtn">Add Quote</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Full quote reader -->
+    <div class="modal quote-reader-modal" id="quoteReaderModal" role="dialog" aria-modal="true" aria-labelledby="quoteReaderTitle">
+        <div class="modal-content quote-reader-content">
+            <div class="modal-header">
+                <p class="quote-reader-kicker" id="quoteReaderTitle">Full quote</p>
+                <button class="modal-close" id="closeQuoteReader" type="button" aria-label="Close full quote">×</button>
+            </div>
+            <img class="quote-reader-image hidden" id="quoteReaderImage" alt="">
+            <blockquote class="quote-reader-text" id="quoteReaderText"></blockquote>
+            <p class="quote-reader-creator hidden" id="quoteReaderCreator"></p>
+            <p class="quote-reader-source hidden" id="quoteReaderSource"></p>
+            <div class="modal-actions quote-reader-actions">
+                <button class="btn btn-primary" id="closeQuoteReaderBtn" type="button">Done</button>
+            </div>
         </div>
     </div>
 
