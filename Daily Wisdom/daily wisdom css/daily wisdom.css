@@ -1317,7 +1317,13 @@
             gap: clamp(60px, 9vw, 150px);
             padding: clamp(92px, 12vw, 170px) 7vw;
             color: #151515;
-            background: #f1eee6;
+            background:
+                linear-gradient(90deg,
+                    rgba(241, 238, 230, 0.86) 0%,
+                    rgba(241, 238, 230, 0.7) 32%,
+                    rgba(241, 238, 230, 0.34) 58%,
+                    rgba(241, 238, 230, 0.08) 100%),
+                url('../../assets/landing image.jpg') center / cover no-repeat;
         }
 
         .cta-intro {
@@ -1344,8 +1350,9 @@
 
         .cta-intro > p:last-child {
             max-width: 440px;
-            color: #655f57;
+            color: #2f2b26;
             font-size: clamp(0.95rem, 1.2vw, 1.08rem);
+            font-weight: 500;
             line-height: 1.7;
         }
 
@@ -1405,7 +1412,7 @@
         .path-number {
             align-self: start;
             padding-top: 6px;
-            color: #8a847b;
+            color: #625c54;
             font-size: 0.65rem;
             letter-spacing: 0.12em;
         }
@@ -1416,6 +1423,14 @@
             gap: 8px;
         }
 
+        .path-card-primary {
+            background: radial-gradient(ellipse 70% 115% at 34% 50%, rgba(247, 244, 237, 0.52), rgba(247, 244, 237, 0) 72%);
+        }
+
+        .path-card-secondary {
+            background: radial-gradient(ellipse 70% 115% at 34% 50%, rgba(247, 244, 237, 0.58), rgba(247, 244, 237, 0) 72%);
+        }
+
         .path-copy strong {
             font-family: 'Crimson Pro', Georgia, serif;
             font-size: clamp(2rem, 3.2vw, 3.2rem);
@@ -1424,8 +1439,10 @@
         }
 
         .path-copy small {
-            color: #746e65;
-            font-size: 0.78rem;
+            color: #211e1a;
+            font-size: 0.82rem;
+            font-weight: 500;
+            text-shadow: 0 1px 8px rgba(23, 21, 18, 0.32);
         }
 
         .path-card:hover .path-copy small,
@@ -1433,6 +1450,11 @@
         .path-card:hover .path-number,
         .path-card:focus-visible .path-number {
             color: rgba(247, 244, 237, 0.6);
+        }
+
+        .path-card:hover .path-copy small,
+        .path-card:focus-visible .path-copy small {
+            text-shadow: none;
         }
 
         .path-arrow {
