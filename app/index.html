@@ -149,9 +149,9 @@
         <div class="settings-container">
             <div class="app-page-heading profile-heading"><p class="app-kicker">Your space</p><h1 class="gallery-title">Profile</h1></div>
             <section class="profile-card">
-                <div class="profile-avatar" aria-hidden="true">DI</div>
-                <div><h2>Your Daily Inspo</h2><p>Keep what moves you.</p></div>
-                <button class="profile-edit-button" type="button">Edit profile</button>
+                <div class="profile-avatar" id="profileAvatar" aria-hidden="true">DI</div>
+                <div><h2 id="profileName">Your Daily Inspo</h2><p>Keep what moves you.</p></div>
+                <button class="profile-edit-button" id="editProfileBtn" type="button">Edit profile</button>
             </section>
             <div class="profile-stats"><div><strong id="profileQuoteCount">0</strong><span>Quotes</span></div><div><strong>0</strong><span>Public</span></div><div><strong>0</strong><span>Collections</span></div></div>
 
@@ -216,6 +216,13 @@
                     </div>
                     <button class="btn btn-secondary" id="openFeedbackBtn" type="button">Send Feedback</button>
                 </div>
+                <div class="settings-item settings-faq-row">
+                    <div>
+                        <div class="settings-item-label">Frequently Asked Questions</div>
+                        <div class="settings-item-description">Find quick answers and helpful tips for using Daily Inspo.</div>
+                    </div>
+                    <a class="btn btn-secondary settings-faq-link" href="/faq/?source=app">FAQ</a>
+                </div>
             </div>
 
             <div class="settings-section">
@@ -240,7 +247,7 @@
                 <div class="settings-item">
                     <div>
                         <div class="settings-item-label">Version</div>
-                        <div class="settings-item-description">Daily Wisdom v1.0</div>
+                        <div class="settings-item-description">Daily Inspo</div>
                     </div>
                 </div>
             </div>
@@ -384,6 +391,35 @@
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="cancelFeedbackBtn">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="submitFeedbackBtn">Send Feedback</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit profile modal -->
+    <div class="modal" id="editProfileModal" role="dialog" aria-modal="true" aria-labelledby="editProfileModalTitle">
+        <div class="modal-content profile-modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="editProfileModalTitle">Edit profile</h2>
+                <button class="modal-close" id="closeProfileModal" type="button" aria-label="Close edit profile">×</button>
+            </div>
+            <form id="editProfileForm">
+                <div class="profile-photo-editor">
+                    <div class="profile-avatar profile-avatar-preview" id="profileAvatarPreview" aria-hidden="true">DI</div>
+                    <div>
+                        <p class="profile-photo-label">Profile photo</p>
+                        <label class="profile-photo-upload" for="profilePhoto">Upload photo</label>
+                        <input class="hidden" id="profilePhoto" type="file" accept="image/*">
+                        <p class="profile-photo-help">JPG, PNG, or GIF</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="profileNameInput">Name</label>
+                    <input class="form-input" id="profileNameInput" name="name" type="text" maxlength="60" autocomplete="name" required>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="cancelProfileBtn" type="button">Cancel</button>
+                    <button class="btn btn-primary" type="submit">Save</button>
                 </div>
             </form>
         </div>

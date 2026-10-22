@@ -480,6 +480,105 @@ import { starterQuotes } from './data/starterQuotes.js';
             }
         });
 
+        const PROFILE_STORAGE_KEY = 'dailyInspoProfile';
+        const DEFAULT_PROFILE_NAME = 'Your Daily Inspo';
+        let pendingProfilePhoto = null;
+
+        function getInitials(name) {
+            const words = (name || DEFAULT_PROFILE_NAME).trim().split(/\s+/).filter(Boolean);
+            return words.slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'DI';
+        }
+
+        function readProfile() {
+            try {
+                const savedProfile = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) || 'null');
+                return {
+                    name: savedProfile?.name?.trim() || DEFAULT_PROFILE_NAME,
+                    photo: savedProfile?.photo || null
+                };
+            } catch (error) {
+                return { name: DEFAULT_PROFILE_NAME, photo: null };
+            }
+        }
+
+        function renderProfile(profile = readProfile(), preview = false) {
+            const avatar = document.getElementById(preview ? 'profileAvatarPreview' : 'profileAvatar');
+            if (!avatar) return;
+
+            avatar.replaceChildren();
+            if (profile.photo) {
+                const image = document.createElement('img');
+                image.src = profile.photo;
+                image.alt = '';
+                avatar.appendChild(image);
+            } else {
+                avatar.textContent = getInitials(profile.name);
+            }
+
+            if (!preview) {
+                const name = document.getElementById('profileName');
+                if (name) name.textContent = profile.name;
+            }
+        }
+
+        function openProfileModal() {
+            const profile = readProfile();
+            pendingProfilePhoto = profile.photo;
+            document.getElementById('profileNameInput').value = profile.name;
+            document.getElementById('profilePhoto').value = '';
+            renderProfile(profile, true);
+            openManagedModal(document.getElementById('editProfileModal'), {
+                initialFocus: document.getElementById('profileNameInput')
+            });
+        }
+
+        function closeProfileModal() {
+            closeManagedModal(document.getElementById('editProfileModal'));
+            pendingProfilePhoto = null;
+        }
+
+        document.getElementById('editProfileBtn').addEventListener('click', openProfileModal);
+        document.getElementById('closeProfileModal').addEventListener('click', closeProfileModal);
+        document.getElementById('cancelProfileBtn').addEventListener('click', closeProfileModal);
+
+        document.getElementById('profilePhoto').addEventListener('change', async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showCustomAlert('Please choose an image file.');
+                event.target.value = '';
+                return;
+            }
+
+            try {
+                pendingProfilePhoto = await fileToBase64(file);
+                renderProfile({ name: document.getElementById('profileNameInput').value, photo: pendingProfilePhoto }, true);
+            } catch (error) {
+                console.error('Profile photo could not be read:', error);
+                showCustomAlert('Your profile photo could not be uploaded. Please try another image.');
+            }
+        });
+
+        document.getElementById('editProfileForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const name = document.getElementById('profileNameInput').value.trim();
+            if (!name) return;
+
+            const profile = { name, photo: pendingProfilePhoto };
+            try {
+                localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+            } catch (error) {
+                console.error('Profile could not be saved:', error);
+                showCustomAlert('Your profile could not be saved. Try a smaller photo.');
+                return;
+            }
+
+            renderProfile(profile);
+            closeProfileModal();
+        });
+
+        renderProfile();
+
         function updateAuthModalUI() {
             const title = document.querySelector('#authModal .modal-title');
             const submitBtn = document.getElementById('authSubmitBtn');
