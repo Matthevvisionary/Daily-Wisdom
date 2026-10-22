@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Frequently asked questions about Daily Inspo.">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="theme-color" content="#090909">
+    <meta name="apple-mobile-web-app-title" content="Daily Inspo">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>FAQ — Daily Inspo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400;1,500;1,600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { color: #181818; background: #f7f4ed; font-family: 'Work Sans', sans-serif; }
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+
+        .site-header { display: flex; align-items: center; justify-content: space-between; min-height: 88px; padding: 0 4.5vw; color: #f7f4ed; background: #090909; border-bottom: 1px solid rgba(255,255,255,.16); }
+        .brand-mark { display: grid; place-items: center; width: 46px; height: 46px; color: #f7f4ed; border: 1px solid rgba(255,255,255,.45); border-radius: 50%; transition: color .2s ease, background .2s ease; }
+        .brand-mark:hover { color: #090909; background: #f7f4ed; }
+        .brand-mark svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.4; }
+        .back-link { color: #f7f4ed; font-size: .7rem; font-weight: 600; letter-spacing: .14em; text-decoration: none; text-transform: uppercase; }
+        .back-link:hover { color: rgba(247,244,237,.65); }
+        .back-link:focus-visible, .brand-mark:focus-visible { outline: 2px solid #f7f4ed; outline-offset: 4px; }
+
+        .faq-hero { padding: clamp(90px,15vw,180px) 7vw clamp(74px,11vw,132px); color: #f7f4ed; background: #090909; }
+        .eyebrow { margin: 0 0 22px; color: rgba(247,244,237,.45); font-size: .68rem; font-weight: 600; letter-spacing: .17em; text-transform: uppercase; }
+        h1, h2, p { margin-top: 0; }
+        h1 { max-width: 800px; margin-bottom: 24px; font-family: 'Crimson Pro', Georgia, serif; font-size: clamp(4rem,10vw,8.4rem); font-weight: 400; letter-spacing: -.055em; line-height: .84; }
+        .hero-intro { max-width: 480px; margin: 0; color: rgba(247,244,237,.68); font-family: 'Crimson Pro', Georgia, serif; font-size: clamp(1.35rem,2.1vw,1.75rem); line-height: 1.25; }
+
+        .faq-content { width: min(100% - 44px, 760px); margin: 0 auto; padding: clamp(72px,11vw,128px) 0; }
+        h2 { max-width: 570px; margin-bottom: 38px; font-family: 'Crimson Pro', Georgia, serif; font-size: clamp(2.5rem,5vw,4.1rem); font-weight: 400; letter-spacing: -.03em; line-height: .98; }
+        .faq-list { border-top: 1px solid rgba(24,24,24,.18); }
+        .faq-item { border-bottom: 1px solid rgba(24,24,24,.18); }
+        .faq-item summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 25px 0; cursor: pointer; color: #181818; font-family: 'Crimson Pro', Georgia, serif; font-size: clamp(1.45rem,2.6vw,2rem); line-height: 1.08; list-style: none; }
+        .faq-item summary::-webkit-details-marker { display: none; }
+        .faq-item summary::after { flex: 0 0 auto; content: '+'; font-family: 'Work Sans', sans-serif; font-size: 1.45rem; font-weight: 400; transition: transform .2s ease; }
+        .faq-item[open] summary::after { transform: rotate(45deg); }
+        .faq-answer { max-width: 560px; padding: 0 42px 27px 0; color: #5a524a; font-size: clamp(1rem,1.45vw,1.12rem); line-height: 1.72; }
+        .faq-answer p { margin: 0; }
+        .tutorial-intro { margin-bottom: 24px !important; }
+        .tutorial-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; margin: 0; padding: 0; list-style: none; }
+        .tutorial-step { min-width: 0; }
+        .step-number { display: block; margin-bottom: 9px; color: #8b8379; font-size: .68rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+        .tutorial-step p { margin-bottom: 16px; }
+        .tutorial-image { display: block; width: 100%; border: 1px solid rgba(24,24,24,.14); }
+        .faq-item summary:focus-visible { outline: 2px solid #181818; outline-offset: -4px; }
+        .contact-note { margin: 28px 0 0; color: #5a524a; font-size: .9rem; line-height: 1.6; }
+        .contact-note a { color: #181818; font-weight: 600; text-underline-offset: 3px; }
+        .site-footer { padding: 31px 7vw; color: rgba(250,248,245,.58); background: #090909; font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
+
+        @media (max-width: 680px) { .site-header { min-height: 76px; padding: 0 22px; } .brand-mark { width: 42px; height: 42px; } .faq-hero { padding-right: 22px; padding-left: 22px; } .tutorial-steps { grid-template-columns: 1fr; } }
+        @media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; } }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand-mark" href="/landing/" aria-label="Daily Inspo home">
+            <svg viewBox="0 0 44 44" aria-hidden="true"><path d="M12 6.5h11.2c7.4 0 12.3 4.1 12.3 10.5 0 5.1-3.3 8.6-8.5 9.8L18 37.5V27h-6V6.5Z" /><path d="M18 12.5h5c3.7 0 6 1.7 6 4.7 0 3.1-2.3 4.8-6 4.8h-5v-9.5Z" /></svg>
+        </a>
+        <a class="back-link" href="/landing/">Back to home</a>
+    </header>
+
+    <main>
+        <section class="faq-hero" aria-labelledby="faq-title">
+            <p class="eyebrow">Daily Inspo support</p>
+            <h1 id="faq-title">Frequently asked questions</h1>
+            <p class="hero-intro">A few helpful answers about keeping the words that move you.</p>
+        </section>
+
+        <article class="faq-content">
+            <section aria-labelledby="answers-title">
+                <h2 id="answers-title">Questions, answered.</h2>
+                <div class="faq-list">
+                    <details class="faq-item">
+                        <summary>Does Daily Inspo have an app?</summary>
+                        <div class="faq-answer"><p>Not yet, but you can add Daily Inspo to your phone’s Home Screen.</p></div>
+                    </details>
+                    <details class="faq-item">
+                        <summary>How do I add Daily Inspo to my home screen?</summary>
+                        <div class="faq-answer">
+                            <p class="tutorial-intro">On an iPhone, open Daily Inspo in Safari, then follow these two steps.</p>
+                            <ol class="tutorial-steps">
+                                <li class="tutorial-step">
+                                    <span class="step-number">Step 1</span>
+                                    <p>Tap the Share button (could be at the top or bottom depending on the browser).</p>
+                                    <p><strong>Safari:</strong></p>
+                                    <img class="tutorial-image" src="../assets/safari-homescreen-tutorial.png" alt="Safari with the Share button highlighted in red.">
+                                    <br>
+                                    <p><strong>Chrome:</strong></p>
+                                    <img class="tutorial-image" src="../assets/chrome-homescreen-tutorial.png" alt="Chrome with the Share button highlighted in red.">
+                                </li>
+                                <li class="tutorial-step">
+                                    <span class="step-number">Step 2</span>
+                                    <p>Scroll down in the sharing menu and tap <strong>Add to Home Screen</strong>.</p>
+                                    <img class="tutorial-image" src="../assets/Shortcut%20Tutorial%202.png" alt="Safari sharing menu with Add to Home Screen highlighted in red.">
+                                </li>
+                            </ol>
+                        </div>
+                    </details>
+                </div>
+            </section>
+            <p class="contact-note">Need help in the meantime? <a href="mailto:support@daily-inspo.app">Contact support</a>.</p>
+        </article>
+    </main>
+
+    <footer class="site-footer">© 2026 Daily Inspo</footer>
+</body>
+</html>
